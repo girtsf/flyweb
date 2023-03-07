@@ -1,0 +1,36 @@
+# Only run when pushing so that you can have dirty commits locally.
+default_stages: [push]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.2.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: https://github.com/psf/black
+    # Should match pyproject.toml.
+    rev: 23.1.0
+    hooks:
+      - id: black
+        language_version: python3.10
+  - repo: https://github.com/pycqa/isort
+    # Should match pyproject.toml.
+    rev: 5.12.0
+    hooks:
+      - id: isort
+  - repo: https://github.com/pycqa/flake8
+    rev: '6.0.0'
+    hooks:
+      - id: flake8
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.299
+    hooks:
+      - id: pyright
+        entry: pyright
+  - repo: meta
+    hooks:
+      - id: check-hooks-apply
+      - id: check-useless-excludes

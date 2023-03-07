@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Installs dev tools and pre-requisites.
+
+set -o errexit
+
+POETRY_VERSION=1.3.2
+
+function setup_poetry {
+  echo "Installing poetry..."
+
+  # Work around https://github.com/python-poetry/poetry/issues/1917
+  export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
+
+  curl -sSL https://install.python-poetry.org | python3 - --version "$POETRY_VERSION"
+  # If the path wasn't in user's profile before, we'll fail the "poetry"
+  # calls below. With this, we can finish bootstrapping.
+  PATH="$HOME/.local/bin:$PATH"
+}
+
+function setup_venv {
+  poetry install --all-extras
+}
+
+function setup_precommit {
+  poetry run pre-commit install -t pre-push
+}
+
+function main {
+  setup_poetry
+  setup_venv
+  setup_precommit
+
+}
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+main
