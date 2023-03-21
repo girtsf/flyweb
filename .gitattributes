@@ -1,0 +1,3 @@
+# Ignore third party js files from repo line counts.
+flyweb/static/socket.io*.js linguist-vendored
+flyweb/static/maquette*.js linguist-vendored
