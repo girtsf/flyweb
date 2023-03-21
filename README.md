@@ -1,12 +1,14 @@
 # FlyWeb
 
-FlyWeb is a smol web framework for writing simple interactive web applications
-without having to write any Javascript. You just write a function that emits
-HTML elements using typed helper wrappers. Event handlers magically just work.
+FlyWeb is a smol live immediate-mode web framework for Python:
 
-## Requirements
-
-FlyWeb requires Python 3.10+ and an ASGI server.
+* *smol*: minimal dependencies (no frontend build required).
+* *live*: updates are pushed to the browser in real time.
+* *immediate-mode*: you write a function that emits HTML elements for the whole
+  page, [immediate mode GUI](https://en.wikipedia.org/wiki/Immediate_mode_GUI)-style.
+* *web framework*: FlyWeb takes care of sending the web page contents
+  to the browser, and calling your Python event handlers magically.
+* *Python*: 3.10+ and an ASGI server required.
 
 ## Examples
 
@@ -68,6 +70,12 @@ Behind the scenes, FlyWeb works like this:
 FlyWeb is mostly intended as a quick way of adding simple web interfaces to
 internal tools without having to do a bunch of scaffolding or frontend builds.
 It probably won't be suitable for handling complex pages or many users.
+
+Currently it assumes that you want to share the state between all the webpage
+users. Implementing per-user state would not be too difficult.
+
+Security: currently there is none, and it's probably pretty easy to crash the
+backend if you try.
 
 ## Status
 
