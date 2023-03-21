@@ -55,9 +55,6 @@ KeyboardEventFunction = Callable[[KeyboardEvent], None]
 class DomNodeProperties(TypedDict, total=False):
     """Property names and types allowed on DOM nodes."""
 
-    # Reference:
-    # https://github.com/AFASSoftware/maquette/blob/master/src/interfaces.ts
-
     # Callbacks for Maquette interactions with DOM.
     afterCreate: FrontendFunction
     afterUpdate: FrontendFunction
@@ -66,6 +63,12 @@ class DomNodeProperties(TypedDict, total=False):
     # Maquette-related things.
     key: str | int
     styles: dict[str, str]
+
+    # This list is incomplete. I added stuff that was exposed in Maquette and
+    # whatever else I needed. It would be good to find a way to autogenerate
+    # this and put the properties in specific elements instead of having a
+    # union of all of them here.
+    # TODO: look at https://github.com/tawesoft/html5spec
 
     # HTMLFormElement:
     action: str
@@ -99,10 +102,10 @@ class DomNodeProperties(TypedDict, total=False):
     onsubmit: EventFunction
 
     spellcheck: bool
-    tabIndex: int
+    tabindex: int
     disabled: bool
     title: str
-    accessKey: str
+    accesskey: str
     class_: str  # emitted as "class", since "class" is reserved in Python
     id: str
     draggable: bool
@@ -112,13 +115,21 @@ class DomNodeProperties(TypedDict, total=False):
     autocomplete: str
     checked: bool
     placeholder: str
-    readOnly: bool
+    readonly: bool
     src: str
     value: str
+    size: int
+    minlength: int
+    maxlength: int
+    pattern: str
 
     # HTMLImageElement:
     alt: str
     srcset: str
+
+    # HTMLTableCellElement:
+    colspan: int
+    rowspan: int
 
     innerHTML: str
 
