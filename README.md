@@ -65,6 +65,10 @@ Behind the scenes, FlyWeb works like this:
   is called again, and the results are sent to the frontend. Maquette diffs the
   VDOMs and updates the real DOM with any changes that happened.
 
+FlyWeb uses [anyio](https://github.com/agronholm/anyio) library (thus should
+work with either built-in `asyncio` or
+[trio](https://github.com/python-trio/trio) libraries).
+
 ## Limitations
 
 FlyWeb is mostly intended as a quick way of adding simple web interfaces to

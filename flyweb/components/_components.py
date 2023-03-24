@@ -67,7 +67,6 @@ class TextInput(Component):
     def _on_key_up(self, event: _flyweb.KeyboardEvent) -> None:
         if event.get("keyCode") == 13 and self._on_enter_key:
             self._on_enter_key(self.value)
-            self.value = ""
 
     def _on_input(self, event: _flyweb.Event) -> None:
         if "target_value" in event:

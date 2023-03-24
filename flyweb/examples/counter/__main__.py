@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 
-import asyncio
-
+import anyio
 from loguru import logger
 
 import flyweb
+
+try:
+    import hypercorn  # noqa: F401
+except ImportError:
+    raise RuntimeError("install extras with flyweb[examples] to run this!")
 
 
 class Counter:
@@ -30,4 +34,4 @@ async def main():
 
 if __name__ == "__main__":
     logger.enable("flyweb")
-    asyncio.run(main())
+    anyio.run(main)

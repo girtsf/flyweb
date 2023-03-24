@@ -14,7 +14,7 @@ include = [
 [tool.poetry.dependencies]
 python = "^3.10"
 python-socketio = "^5.7.2"
-anyio = {version = "^3.6.2", optional = true}
+anyio = "^3.6.2"
 hypercorn = {version = "^0.14.3", optional = true}
 typing-extensions = "^4.5.0"
 loguru = "^0.6.0"
@@ -25,9 +25,12 @@ black = "^23.1.0"
 isort = "^5.12.0"
 pre-commit = "^3.1.1"
 
+# We don't install an ASGI server by default. You have to install
+# flyweb[examples] or flyweb[server] for hypercorn to be installed.
+
 [tool.poetry.extras]
-examples = ["anyio", "hypercorn"]
-server = ["anyio", "hypercorn"]
+examples = ["hypercorn"]
+server = ["hypercorn"]
 
 [build-system]
 requires = ["poetry-core"]

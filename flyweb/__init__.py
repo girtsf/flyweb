@@ -8,7 +8,14 @@ from ._flyweb import FrontendFunction
 from ._flyweb import KeyboardEvent
 from ._flyweb import MouseEvent
 from ._flyweb import UIEvent
-from ._server import Server
+
+# You must install flyweb[server] to include an asgi server.
+try:
+    import hypercorn  # noqa: F401
+except ImportError:
+    from ._server_stub import Server
+else:
+    from ._server import Server
 
 # Disable logging for "flyweb" namespace by default. You can opt in to logs
 # with logger.enable("flyweb").

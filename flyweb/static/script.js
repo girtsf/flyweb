@@ -2,6 +2,13 @@ var vdom = null;
 var sio = io();
 var projector = maquette.createProjector();
 
+window.addEventListener("error", (event) => {
+  console.log("Caught top-level error", event.error);
+  document.getElementById("flyweb-error-messages").innerText =
+      event.error.error.stack;
+  document.getElementById("flyweb-error").showModal();
+});
+
 // Recursively replaces a dict from backend with nested Maquette VDOM.
 function toMaquetteDom(thing) {
   if (typeof thing == "string") {
@@ -48,13 +55,16 @@ sio.on("update", (msg) => {
   let init = (vdom === null);
   vdom = toMaquetteDom(msg);
   if (init) {
-    projector.append(document.body, render);
+    projector.append(document.getElementById('flyweb-contents'), render);
   } else {
     projector.scheduleRender();
   }
 });
 
+sio.on("connect", () => {
+  document.getElementById("flyweb-disconnected").close();
+});
+
 sio.on("disconnect", () => {
-  vdom = maquette.h("div", {key: "__webfly_disconnected__"}, ["--disconnected--"]);
-  projector.scheduleRender();
+  document.getElementById("flyweb-disconnected").showModal();
 });

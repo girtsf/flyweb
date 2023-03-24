@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-try:
-    import anyio
-except ImportError:
-    raise RuntimeError("install extras with flyweb[examples] to run this!")
+import anyio
 
 import flyweb
 from flyweb import components
+
+try:
+    import hypercorn  # noqa: F401
+except ImportError:
+    raise RuntimeError("install extras with flyweb[examples] to run this!")
+
 
 # CSS fragment that will be sent to frontend.
 _CSS = """
@@ -41,6 +44,7 @@ class TodoList:
             id=self._next_id, title=value, parent=self
         )
         self._next_id += 1
+        self._add.value = ""
 
     def render(self, w: flyweb.FlyWeb):
         with w.div():

@@ -5,7 +5,7 @@ name = "anyio"
 version = "3.6.2"
 description = "High level compatibility layer for multiple asynchronous event loop implementations"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6.2"
 files = [
     {file = "anyio-3.6.2-py3-none-any.whl", hash = "sha256:fbbe32bd270d2a2ef3ed1c5d45041250284e31fc0a4df4a5a6071842051a51e3"},
@@ -174,19 +174,19 @@ test = ["pytest (>=6)"]
 
 [[package]]
 name = "filelock"
-version = "3.10.0"
+version = "3.10.2"
 description = "A platform independent file lock."
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "filelock-3.10.0-py3-none-any.whl", hash = "sha256:e90b34656470756edf8b19656785c5fea73afa1953f3e1b0d645cef11cab3182"},
-    {file = "filelock-3.10.0.tar.gz", hash = "sha256:3199fd0d3faea8b911be52b663dfccceb84c95949dd13179aa21436d1a79c4ce"},
+    {file = "filelock-3.10.2-py3-none-any.whl", hash = "sha256:eb8f0f2d37ed68223ea63e3bddf2fac99667e4362c88b3f762e434d160190d18"},
+    {file = "filelock-3.10.2.tar.gz", hash = "sha256:75997740323c5f12e18f10b494bc11c03e42843129f980f17c04352cc7b09d40"},
 ]
 
 [package.extras]
 docs = ["furo (>=2022.12.7)", "sphinx (>=6.1.3)", "sphinx-autodoc-typehints (>=1.22,!=1.23.4)"]
-testing = ["covdefaults (>=2.3)", "coverage (>=7.2.1)", "pytest (>=7.2.2)", "pytest-cov (>=4)", "pytest-timeout (>=2.1)"]
+testing = ["covdefaults (>=2.3)", "coverage (>=7.2.2)", "pytest (>=7.2.2)", "pytest-cov (>=4)", "pytest-timeout (>=2.1)"]
 
 [[package]]
 name = "h11"
@@ -285,7 +285,7 @@ name = "idna"
 version = "3.4"
 description = "Internationalized Domain Names in Applications (IDNA)"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.5"
 files = [
     {file = "idna-3.4-py3-none-any.whl", hash = "sha256:90b77e79eaa3eba6de819a0c442c0b4ceefc341a7a2ab77d7562bf49f425c5c2"},
@@ -587,7 +587,7 @@ name = "sniffio"
 version = "1.3.0"
 description = "Sniff out which async library your code is running under"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 files = [
     {file = "sniffio-1.3.0-py3-none-any.whl", hash = "sha256:eecefdce1e5bbfb7ad2eeaabf7c1eeb404d7757c379bd1f7e5cce9d8bf425384"},
@@ -682,10 +682,10 @@ files = [
 h11 = ">=0.9.0,<1"
 
 [extras]
-examples = ["anyio", "hypercorn"]
-server = ["anyio", "hypercorn"]
+examples = ["hypercorn"]
+server = ["hypercorn"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "b6e7e8854f15ec7c9e491c83134e69d657c877e21f9363d184b3b97ca4ce1d03"
+content-hash = "7312eb61690ab668e160b7bd521053496c3197f04fe0aefd8740507640a44623"
