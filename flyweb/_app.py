@@ -4,9 +4,8 @@ import contextlib
 from importlib import resources
 import pathlib
 import re
-import shutil
 import tempfile
-from typing import Callable
+from typing import Callable, Iterable
 
 import anyio
 from loguru import logger
@@ -61,29 +60,14 @@ class App:
         ctx, self._ctx = self._ctx, None
         return await ctx.__aexit__(*args, **kwargs)
 
+    async def __call__(self, scope, receive, send):
+        if not self._sio_app:
+            raise RuntimeError("you must enter App's async context")
+        await self._sio_app(scope, receive, send)
+
     @contextlib.asynccontextmanager
     async def _make_context(self):
-        index_html_template = (
-            resources.files(flyweb).joinpath("static/index.html").read_text()
-        )
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = pathlib.Path(tmp_dir)
-
-            # Copy static/ dir.
-            s = resources.files(flyweb).joinpath("static")
-            with resources.as_file(s) as static_dir:
-                shutil.copytree(static_dir, tmp_path / "static")
-
-            # Generate index.html and add any extra css files to static/.
-            index_html = self._make_index_html(tmp_path, index_html_template)
-
-            (tmp_path / "index.html").write_text(index_html)
-
-            static_files = {
-                self._path: str(tmp_path / "index.html"),
-                self._path.removesuffix("/") + "/static": str(tmp_path / "static"),
-            }
+        with self._make_static_dir() as static_files:
             self._sio_app = socketio.ASGIApp(
                 self._sio,
                 static_files=static_files,
@@ -94,10 +78,28 @@ class App:
                 tg.cancel_scope.cancel()
         self._sio_app = None
 
-    async def __call__(self, scope, receive, send):
-        if not self._sio_app:
-            raise RuntimeError("you must enter App's async context")
-        await self._sio_app(scope, receive, send)
+    @contextlib.contextmanager
+    def _make_static_dir(self):
+        index_html_template = (
+            resources.files(flyweb).joinpath("static/index.html").read_text()
+        )
+        # Create a temporary directory. We'll write index.html to it and any
+        # CSS fragments that were passed in as strings.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = pathlib.Path(tmp_dir)
+            static_files = self._make_css_static_files_map(tmp_path)
+
+            index_html = self._make_index_html(index_html_template, static_files.keys())
+            (tmp_path / "index.html").write_text(index_html)
+            static_files[self._path] = str(tmp_path / "index.html")
+
+            with resources.as_file(
+                resources.files(flyweb).joinpath("static")
+            ) as flyweb_static_files:
+                static_files[self._path.removesuffix("/") + "/static"] = str(
+                    flyweb_static_files
+                )
+                yield static_files
 
     async def _update_task(self) -> None:
         self._update_requested = anyio.Event()
@@ -106,15 +108,26 @@ class App:
             self._update_requested = anyio.Event()
             await self._update()
 
-    def _make_index_html(self, static_files_path: pathlib.Path, template: str) -> str:
-        ss = []
+    def _make_css_static_files_map(
+        self, tmp_static_path: pathlib.Path
+    ) -> dict[str, str]:
+        static_files = {}
         for i, str_or_path in enumerate(self._extra_css):
-            css_file = static_files_path / "static" / f"{i}.css"
+            basename = f"{i}.css"
             if isinstance(str_or_path, pathlib.Path):
-                shutil.copy(str_or_path, css_file)
+                # extra CSS is a file, add it to static file mappings.
+                path = str_or_path
             else:
-                css_file.write_text(str_or_path)
-            ss += [f'<link rel="stylesheet" href="static/{i}.css">']
+                # extra CSS is a string, write it out to temp file.
+                path = tmp_static_path / basename
+                path.write_text(str_or_path)
+            static_files[self._path.removesuffix("/") + f"/static/{basename}"] = str(
+                path
+            )
+        return static_files
+
+    def _make_index_html(self, template: str, stylesheets: Iterable[str]) -> str:
+        ss = [f'<link rel="stylesheet" href="{x}">' for x in stylesheets]
         return re.sub(r"(?m)^\s*<!-- STYLESHEETS -->\s*$", "\n".join(ss), template)
 
     def schedule_update(self) -> None:

@@ -4,8 +4,11 @@ var projector = maquette.createProjector();
 
 window.addEventListener("error", (event) => {
   console.log("Caught top-level error", event.error);
-  document.getElementById("flyweb-error-messages").innerText =
-      event.error.error.stack;
+  let err = event.error.stack;
+  if (event.error.error) {
+    err = event.error.error.stack;
+  }
+  document.getElementById("flyweb-error-messages").innerText = err;
   document.getElementById("flyweb-error").showModal();
 });
 

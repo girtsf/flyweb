@@ -1,0 +1,3 @@
+#!/usr/bin/bash
+
+exec pre-commit run --all-files --hook-stage pre-push
