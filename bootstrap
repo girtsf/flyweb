@@ -20,6 +20,7 @@ function setup_poetry {
 
 function setup_venv {
   poetry install --all-extras
+  poetry run playwright install
 }
 
 function setup_precommit {
@@ -30,7 +31,6 @@ function main {
   setup_poetry
   setup_venv
   setup_precommit
-
 }
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
