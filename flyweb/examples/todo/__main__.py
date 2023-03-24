@@ -70,12 +70,13 @@ class TodoItem:
     def render(self, w: flyweb.FlyWeb):
         with w.li(key=self.id):
             with w.div():
-                self._completed.render(w)
-                if self._editing:
-                    self._editing.render(w)
-                else:
-                    w.elem("label", self.title, ondblclick=self._on_double_click_label)
-                w.elem("button", "delete", onclick=self._on_click_delete)
+                with w.label():
+                    self._completed.render(w)
+                    if self._editing:
+                        self._editing.render(w)
+                    else:
+                        w.span(self.title, ondblclick=self._on_double_click_label)
+                    w.elem("button", "delete", onclick=self._on_click_delete)
 
     def _on_double_click_label(self, _) -> None:
         self._editing = components.TextInput(
@@ -101,9 +102,9 @@ class TodoItem:
         self.parent.delete_todo(self.id)
 
 
-async def main():
+async def main(port=8000):
     todo_list = TodoList()
-    server = flyweb.Server(todo_list.render, port=8000, extra_css=[_CSS])
+    server = flyweb.Server(todo_list.render, port=port, extra_css=[_CSS])
     await server.run()
 
 
