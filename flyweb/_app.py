@@ -8,6 +8,7 @@ import shutil
 import tempfile
 from typing import Callable
 
+import anyio
 from loguru import logger
 import socketio
 
@@ -44,6 +45,9 @@ class App:
         self._flyweb = flyweb.FlyWeb()
         self._sio_app = None
         self._ctx = None
+        # Wait to initialize it until we are running. Otherwise, this blows up
+        # if the object is instantiated before running in async context.
+        self._update_requested: anyio.Event | None = None
 
     async def __aenter__(self) -> App:
         if self._ctx:
@@ -84,13 +88,23 @@ class App:
                 self._sio,
                 static_files=static_files,
             )
-            yield self
+            async with anyio.create_task_group() as tg:
+                tg.start_soon(self._update_task)
+                yield self
+                tg.cancel_scope.cancel()
         self._sio_app = None
 
     async def __call__(self, scope, receive, send):
         if not self._sio_app:
             raise RuntimeError("you must enter App's async context")
         await self._sio_app(scope, receive, send)
+
+    async def _update_task(self) -> None:
+        self._update_requested = anyio.Event()
+        while True:
+            await self._update_requested.wait()
+            self._update_requested = anyio.Event()
+            await self._update()
 
     def _make_index_html(self, static_files_path: pathlib.Path, template: str) -> str:
         ss = []
@@ -102,6 +116,10 @@ class App:
                 css_file.write_text(str_or_path)
             ss += [f'<link rel="stylesheet" href="static/{i}.css">']
         return re.sub(r"(?m)^\s*<!-- STYLESHEETS -->\s*$", "\n".join(ss), template)
+
+    def schedule_update(self) -> None:
+        if self._update_requested is not None:
+            self._update_requested.set()
 
     async def update(self) -> None:
         await self._update()

@@ -15,7 +15,10 @@ _EVAL = "__flyweb_eval__"
 
 
 class FrontendFunction:
-    """Function that runs in the browser and is not passed to the backend."""
+    """Function that runs in the browser.
+
+    FrontendFunctions don't pass events to the backend.
+    """
 
     def __init__(self, js: str):
         self.js = js
@@ -115,7 +118,8 @@ class DomNodeProperties(TypedDict, total=False):
     autocomplete: str
     checked: bool
     placeholder: str
-    readonly: bool
+    # note: the property has capital "O", while the attribute doesn't.
+    readOnly: bool
     src: str
     value: str
     size: int
@@ -128,10 +132,15 @@ class DomNodeProperties(TypedDict, total=False):
     srcset: str
 
     # HTMLTableCellElement:
-    colspan: int
-    rowspan: int
+    colSpan: int
+    rowSpan: int
+
+    # HTMLTextAreaElement:
+    rows: int
+    cols: int
 
     innerHTML: str
+    style: str
 
     # TODO: add the rest of event handlers and properties as needed.
 

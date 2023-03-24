@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
-try:
-    import anyio
-except ImportError:
-    raise RuntimeError("install extras with flyweb[examples] to run this!")
-
 import datetime
 
+import anyio
+
 import flyweb
+
+try:
+    import hypercorn  # noqa: F401
+except ImportError:
+    raise RuntimeError("install extras with flyweb[examples] to run this!")
 
 
 class Stopwatch:
@@ -57,7 +59,7 @@ class Stopwatch:
 
 async def _update_task(server: flyweb.Server) -> None:
     while True:
-        await server.update()
+        server.schedule_update()
         await anyio.sleep(0.25)
 
 
