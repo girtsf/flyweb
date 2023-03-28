@@ -1,5 +1,3 @@
-from loguru import logger
-
 from ._app import App
 from ._flyweb import Event
 from ._flyweb import FlyWeb
@@ -17,10 +15,6 @@ except ImportError:
 else:
     from ._server import Server
 
-# Disable logging for "flyweb" namespace by default. You can opt in to logs
-# with logger.enable("flyweb").
-
-logger.disable("flyweb")
 
 __all__ = [
     "App",

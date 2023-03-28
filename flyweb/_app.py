@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import contextlib
 from importlib import resources
+import logging
 import pathlib
 import re
 import tempfile
 from typing import Callable, Iterable
 
 import anyio
-from loguru import logger
 import socketio
 
 import flyweb
+
+logger = logging.getLogger("flyweb")
 
 
 class App:
