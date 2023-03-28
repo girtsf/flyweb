@@ -105,10 +105,10 @@ class DomNodeProperties(TypedDict, total=False):
     onsubmit: EventFunction
 
     spellcheck: bool
-    tabindex: int
+    tabIndex: int
     disabled: bool
     title: str
-    accesskey: str
+    accessKey: str
     class_: str  # emitted as "class", since "class" is reserved in Python
     id: str
     draggable: bool
@@ -123,8 +123,8 @@ class DomNodeProperties(TypedDict, total=False):
     src: str
     value: str
     size: int
-    minlength: int
-    maxlength: int
+    minLength: int
+    maxLength: int
     pattern: str
 
     # HTMLImageElement:
