@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import anyio
-from loguru import logger
 
 import flyweb
 
@@ -33,5 +32,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    logger.enable("flyweb")
     anyio.run(main)

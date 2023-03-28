@@ -17,7 +17,6 @@ python-socketio = "^5.7.2"
 anyio = "^3.6.2"
 hypercorn = {version = "^0.14.3", optional = true}
 typing-extensions = "^4.5.0"
-loguru = "^0.6.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.2"

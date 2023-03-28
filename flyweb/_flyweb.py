@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import logging
 import typing
 from typing import Any, Callable, TypedDict
 
-from loguru import logger
 from typing_extensions import Unpack
+
+logger = logging.getLogger("flyweb")
+
 
 _EVENT_HANDLER_KEY = "__flyweb_event_handler_key__"
 _EVAL = "__flyweb_eval__"
