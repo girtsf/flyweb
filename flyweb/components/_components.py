@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from typing_extensions import Unpack
 
@@ -35,7 +35,6 @@ class TextInput(Component):
         self,
         *,
         value: str | None = None,
-        on_enter_key: Callable[[str], None] | None = None,
         **props: Unpack[_flyweb.DomNodeProperties],
     ):
         props = props.copy()
@@ -46,31 +45,27 @@ class TextInput(Component):
             # than one". It would be nice to come up with a better way to do
             # this.
             props["key"] = "text"
-        assert "onkeyup" not in props
-        props["onkeyup"] = self._on_key_up
-        assert "oninput" not in props
-        props["oninput"] = self._on_input
+        self._original_onblur = props.get("onblur")
+        props["onblur"] = self._on_blur
+        props["value"] = value or ""
         super().__init__("input", **props)
 
-        self.value = value or ""
-        self._on_enter_key = on_enter_key
+        # TODO: implement a client-side <on key> that sends a custom event.
 
-    def render(self, w: _flyweb.FlyWeb) -> None:
-        # I don't quite like this. It would be nice if it picked up "value"
-        # automatically. Maybe it should grab all instance variables that don't
-        # begin with "_" and stuff them in props?
-        self.props["value"] = self.value
-        super().render(w)
+    @property
+    def value(self) -> str:
+        assert "value" in self._props
+        return self._props["value"]
 
-    # TODO: switch this to a client-side fragment that does this, otherwise we
-    # might lose keystrokes when typing too fast.
-    def _on_key_up(self, event: _flyweb.KeyboardEvent) -> None:
-        if event.get("keyCode") == 13 and self._on_enter_key:
-            self._on_enter_key(self.value)
+    @value.setter
+    def value(self, value: str) -> None:
+        self._props["value"] = value
 
-    def _on_input(self, event: _flyweb.Event) -> None:
+    def _on_blur(self, event: _flyweb.FocusEvent) -> None:
         if "target_value" in event:
             self.value = event["target_value"]
+        if self._original_onblur:
+            self._original_onblur(event)
 
 
 class CheckBox(Component):

@@ -64,7 +64,10 @@ async def test_todo_example():
             ).to_be_editable()
             await page.keyboard.press("Control+A")
             await page.keyboard.type("eat pizza", delay=100)
-            await page.keyboard.press("Enter")
+            # TODO: re-add when supported.
+            # await page.keyboard.press("Enter")
+            await page.locator("html").click()
+
             await async_api.expect(
                 page.get_by_role("listitem").get_by_role("textbox")
             ).to_have_count(0)
@@ -80,7 +83,7 @@ async def test_todo_example():
             # Add a new item.
             await page.get_by_placeholder("do what?").click()
             await page.get_by_placeholder("do what?").fill("write tests")
-            await page.get_by_placeholder("do what?").press("Enter")
+            await page.get_by_role("button", name="add").click()
 
             await async_api.expect(page.get_by_text("write tests")).to_be_visible()
 
