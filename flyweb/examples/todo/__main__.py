@@ -30,18 +30,18 @@ class TodoList:
             1: TodoItem(id=1, title="write code", completed=True, parent=self),
             2: TodoItem(id=2, title="write more code", parent=self),
         }
-        self._add = components.TextInput(
-            placeholder="do what?", on_enter_key=self._on_add
-        )
+        # TODO: re-add back on_enter_key once we have it implemented on client
+        # side.
+        self._add = components.TextInput(placeholder="do what?")
         self._next_id = 3
 
     def delete_todo(self, id: int) -> None:
         if id in self._items:
             del self._items[id]
 
-    def _on_add(self, value: str) -> None:
+    def _on_add(self, _) -> None:
         self._items[self._next_id] = TodoItem(
-            id=self._next_id, title=value, parent=self
+            id=self._next_id, title=self._add.value, parent=self
         )
         self._next_id += 1
         self._add.value = ""
@@ -57,6 +57,7 @@ class TodoList:
             with w.span():
                 w.text("add:")
                 self._add.render(w)
+                w.button("add", onclick=self._on_add)
 
 
 class TodoItem:
@@ -81,7 +82,6 @@ class TodoItem:
     def _on_double_click_label(self, _) -> None:
         self._editing = components.TextInput(
             value=self.title,
-            on_enter_key=self._on_enter_key,
             onblur=self._on_blur,
             # "afterCreate" is a maquette hook that gets called when the
             # element gets attached to the real DOM.
