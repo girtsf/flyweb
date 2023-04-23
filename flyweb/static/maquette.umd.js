@@ -239,6 +239,7 @@
         }
     };
     var createDom = function (vnode, parentNode, insertBefore, projectionOptions) {
+        var _a;
         var domNode;
         var start = 0;
         var vnodeSelector = vnode.vnodeSelector;
@@ -279,7 +280,11 @@
                             domNode = vnode.domNode = doc.createElementNS(projectionOptions.namespace, found);
                         }
                         else {
-                            domNode = vnode.domNode = vnode.domNode || doc.createElement(found);
+                            domNode = vnode.domNode =
+                                vnode.domNode ||
+                                    (((_a = vnode.properties) === null || _a === void 0 ? void 0 : _a.is)
+                                        ? doc.createElement(found, { is: vnode.properties.is })
+                                        : doc.createElement(found));
                             if (found === "input" && vnode.properties && vnode.properties.type !== undefined) {
                                 // IE8 and older don't support setting input type after the DOM Node has been added to the document
                                 domNode.setAttribute("type", vnode.properties.type);
@@ -915,7 +920,5 @@
     exports.createProjector = createProjector;
     exports.dom = dom;
     exports.h = h;
-
-    Object.defineProperty(exports, '__esModule', { value: true });
 
 }));

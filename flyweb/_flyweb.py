@@ -2,19 +2,35 @@
 
 from __future__ import annotations
 
+import collections
 import contextlib
 import dataclasses
+import inspect
 import logging
+import time
 import typing
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, Protocol, Type, TypedDict
 
 from typing_extensions import Unpack
 
 logger = logging.getLogger("flyweb")
 
 
-_EVENT_HANDLER_KEY = "__flyweb_event_handler_key__"
-_EVAL = "__flyweb_eval__"
+_EVAL = "_flyweb_eval"
+_EVENT_HANDLER = "_flyweb_event_handler"
+_FORCE_VALUE = "_flyweb_force_value"
+
+
+class ForceValue:
+    def __init__(self, value: str):
+        self.value = value
+        self._timestamp = time.time()
+
+    def serialize(self) -> list[str | float]:
+        return [_FORCE_VALUE, self._timestamp, self.value]
+
+    def __repr__(self) -> str:
+        return f"ForceValue({self.value!r})"
 
 
 class FrontendFunction:
@@ -28,6 +44,7 @@ class FrontendFunction:
 
 
 class Event(TypedDict, total=False):
+    _flyweb_handler_key: str
     type: str
     target_id: str
     # Set if "target" element has a "value" property.
@@ -49,6 +66,7 @@ class MouseEvent(UIEvent):
 
 class KeyboardEvent(UIEvent):
     code: str
+    key: str
     keyCode: int
 
 
@@ -58,8 +76,16 @@ MouseEventFunction = Callable[[MouseEvent], None]
 KeyboardEventFunction = Callable[[KeyboardEvent], None]
 
 
+class FlyWebProperties(TypedDict, total=False):
+    # If present, register onkeydown on the frontend and generate events for
+    # specified keys.
+    individualKeyDownHandlers: dict[str, KeyboardEventFunction]
+
+
 class DomNodeProperties(TypedDict, total=False):
     """Property names and types allowed on DOM nodes."""
+
+    _flyweb: FlyWebProperties
 
     # Callbacks for Maquette interactions with DOM.
     afterCreate: FrontendFunction
@@ -114,6 +140,7 @@ class DomNodeProperties(TypedDict, total=False):
     accessKey: str
     class_: str  # emitted as "class", since "class" is reserved in Python
     id: str
+    is_: str  # emitted as "is", since "is" is reserved in Python
     draggable: bool
 
     # HTMLInputElement:
@@ -124,7 +151,7 @@ class DomNodeProperties(TypedDict, total=False):
     # note: the property has capital "O", while the attribute doesn't.
     readOnly: bool
     src: str
-    value: str
+    value: str | ForceValue
     size: int
     minLength: int
     maxLength: int
@@ -148,177 +175,237 @@ class DomNodeProperties(TypedDict, total=False):
     # TODO: add the rest of event handlers and properties as needed.
 
 
-@dataclasses.dataclass(kw_only=True, slots=True)
+@dataclasses.dataclass
 class DomNode:
     tag: str
     children: list[str | DomNode] = dataclasses.field(default_factory=list)
-    props: dict = dataclasses.field(default_factory=lambda: {})
+    props: dict = dataclasses.field(default_factory=dict)
 
-    def serialize(self) -> dict:
-        return _serialize_dict(self)
-
-
-def _make_js_function(event_var_mapping: dict[str, str], event_handler_key: str) -> str:
-    # Function takes in event, returns a message to send to the backend.
-    fn = [
-        "function(e) {",
-        "  e.preventDefault();",
-        "  let msg = {};",
-        f'  msg.{_EVENT_HANDLER_KEY} = "{event_handler_key}";',
-    ]
-    for msg_key, value_getter in event_var_mapping.items():
-        fn += [
-            f"  {{ let v = {value_getter};"
-            f" if (v !== undefined) {{ msg.{msg_key} = v; }} }}"
-        ]
-    fn += [
-        "  return msg;",
-        "}",
-    ]
-    return "\n".join(fn)
+    def serialize(self) -> str | list[str | list | dict]:
+        return _serialize(self)
 
 
-def _serialize(x: DomNode | str) -> str | dict[str, str | list | dict]:
+def _serialize(x: str | DomNode) -> str | list[str | list | dict]:
     if isinstance(x, str):
         return x
-    elif not isinstance(x, DomNode):
-        raise TypeError(f"unexpected node type: {x.__class__.__name__}")
-    return _serialize_dict(x)
+    assert isinstance(x, DomNode)
+    children = [_serialize(x) for x in x.children]
+    return [x.tag, x.props, children]
 
 
-def _serialize_dict(x: DomNode) -> dict[str, str | list | dict]:
-    out: dict[str, str | list | dict] = {
-        "tag": x.tag,
-    }
-    if x.children:
-        out["children"] = [_serialize(c) for c in x.children]
-    if x.props:
-        out["props"] = x.props
-    return out
+def serialize(f: FlyWeb) -> list[str | list | dict]:
+    serialized = f._root.serialize()
+    assert isinstance(serialized, list)
+    return serialized
+
+
+@dataclasses.dataclass
+class _DomNodeContext:
+    path: list[str]
+    children_ids: collections.Counter[str] = dataclasses.field(
+        default_factory=collections.Counter
+    )
+    children_keys: set[str | int] = dataclasses.field(default_factory=set)
+
+
+class _Renderable(Protocol):
+    """Protocol for things that implement "render" method."""
+
+    def render(self, w: FlyWeb) -> None:
+        ...
 
 
 class FlyWeb:
     def __init__(self):
-        self._dom = DomNode(tag="div")
-        self._last = self._dom
-        self._path = "flyweb"
-        self._children_by_tag = {}
-        self._event_handlers = {}
+        self._root = DomNode(tag="div")
+        self._node: DomNode = self._root
+        self._ctx = _DomNodeContext(path=["flyweb"])
+
+        self._event_handlers: dict[str, EventFunction] = {}
 
     @contextlib.contextmanager
-    def _last_child_context(self, path: str):
-        prev = self._last
-        prev_children_by_tag = self._children_by_tag
-        prev_path = self._path
-        last_children = self._last.children
-        assert last_children
-        last_child = last_children[-1]
-        assert isinstance(last_child, DomNode)
-        self._last = last_child
-        self._path = path
-        self._children_by_tag = {}
+    def _dom_node_context(self, node: DomNode, path: list[str]):
+        prev_node = self._node
+        prev_ctx = self._ctx
+        self._node = node
+        self._ctx = _DomNodeContext(path)
         try:
             yield
         finally:
-            self._last = prev
-            self._path = prev_path
-            self._children_by_tag = prev_children_by_tag
+            self._node = prev_node
+            self._ctx = prev_ctx
 
-    def _fix_up_props(self, node_props: DomNodeProperties, path: str) -> dict:
-        props = typing.cast(dict, node_props.copy())
-        if "class_" in props:
-            props["class"] = props.pop("class_")
+    def _fix_up_callables(
+        self,
+        d: dict[str, Any],
+        path: list[str],
+        *,
+        use_handler_key: bool = False,
+        type_class: Type[DomNodeProperties] | dict[str, Any] | None,
+    ) -> None:
+        if not d:
+            return
+        if "id" in d:
+            id_ = d.get("id")
+        else:
+            id_ = "/".join(path)
+        id_needed = False
 
-        property_types = typing.get_type_hints(DomNodeProperties)
-
-        for name, value in props.items():
+        for name, value in d.items():
             if isinstance(value, FrontendFunction):
-                props[name] = [_EVAL, value.js]
+                d[name] = (_EVAL, value.js)
+                continue
+            elif isinstance(value, dict):
+                d[name] = value.copy()
+                if type_class:
+                    value_annots = typing.get_type_hints(type_class).get(name)
+                    child_type_class = value_annots
+                else:
+                    child_type_class = None
+                self._fix_up_callables(
+                    d[name],
+                    path + [name],
+                    use_handler_key=True,
+                    type_class=child_type_class,
+                )
                 continue
             if not callable(value):
                 continue
-            if name not in property_types:
-                raise RuntimeError(f'unsupported event handler "{name}" ({path})')
-            args = typing.get_args(property_types[name])
-            # args is now something like:
-            # ([<class 'flyweb._flyweb.FocusEvent'>], <class 'NoneType'>)
-            assert len(args[0]) == 1
-            handler_arg_type = args[0][0]
 
-            # If "id" was given, use that to specify the event handler id.
-            # Otherwise, use the generated path.
-            if "id" in props:
-                event_handler_key = props["id"] + "-" + name
+            # We get callable type by looking at the function, and by looking
+            # at the props annotations. If they disagree, raise an error. If
+            # function does not have annotations, use type from props.
+            #
+            # TODO: this could use some comments and unittesting.
+
+            args_annots = inspect.get_annotations(value, eval_str=True)
+            # value_annots is a dict with optional "return" key, and keys
+            args_annots.pop("return", None)
+            if len(args_annots) > 1:
+                raise RuntimeError(f'event handler "{value}" has more than 1 arg')
+            if args_annots:
+                _, arg = args_annots.popitem()
             else:
-                event_handler_key = path + "-" + name
+                arg = None
 
-            event_var_mapping = {
-                "type": "e.type",
-                "target_id": "e.target.id",
-                "target_value": "e.target.value",
-            }
+            annot_arg = None
+            if type_class:
+                if typing.get_origin(type_class) is dict:
+                    args = typing.get_args(type_class)
+                    # args is [class 'str', typing.Callable[[...], ...]]
+                    assert len(args) == 2
+                    assert isinstance(args[1], typing.Callable)
 
-            if handler_arg_type is FocusEvent:
-                pass
-            elif handler_arg_type is MouseEvent:
-                event_var_mapping["detail"] = "e.detail"
-                event_var_mapping["button"] = "e.button"
-                event_var_mapping["buttons"] = "e.buttons"
-            elif handler_arg_type is KeyboardEvent:
-                event_var_mapping["detail"] = "e.detail"
-                event_var_mapping["code"] = "e.code"
-                event_var_mapping["keyCode"] = "e.keyCode"
-                pass
-            elif handler_arg_type is Event:
-                pass
+                    args = typing.get_args(args[1])
+                    # args is [[<args>], <return value>]
+                    assert len(args) == 2
+                    input_types, _ = args
+                    assert len(input_types) == 1
+
+                    annot_arg = input_types[0]
+
+            if arg and annot_arg:
+                if arg is not annot_arg:
+                    # TODO: clean this up and make the error messages better.
+                    raise RuntimeError(f"Mismatch between {arg=} and {annot_arg=}")
+
+            if not arg:
+                arg = annot_arg
+
+            if not arg:
+                event_handler_type = "no_args"
+            elif arg is Event:
+                event_handler_type = "event"
+            elif arg is MouseEvent:
+                event_handler_type = "mouse_event"
+            elif arg is FocusEvent:
+                event_handler_type = "focus_event"
+            elif arg is KeyboardEvent:
+                event_handler_type = "keyboard_event"
             else:
-                raise RuntimeError(f"BUG: unexpected {handler_arg_type=}")
-
-            # TODO: we might want to define the mappings in script.js to reduce
-            # the amount of JS code we have to fling across and eval.
-            fn = _make_js_function(event_var_mapping, event_handler_key)
-
-            if event_handler_key in self._event_handlers:
                 raise RuntimeError(
-                    f'repeated event handler key "{event_handler_key}" in the dom tree'
+                    f'event handler "{callable}" has'
+                    f' unsupported arg type "{arg.__name__}"'
                 )
-            self._event_handlers[event_handler_key] = props[name]
-            props[name] = [_EVAL, fn]
+            handler_key = f"{id_}/{name}"
+            self._event_handlers[handler_key] = value
+            if use_handler_key:
+                d[name] = [_EVENT_HANDLER, event_handler_type, handler_key]
+            else:
+                # We'll look up event by target id + "on" + event type.
+                d[name] = [_EVENT_HANDLER, event_handler_type]
+                id_needed = True
+        if id_needed:
+            d["id"] = id_
+
+    def _fix_up_props(self, node_props: DomNodeProperties, path: list[str]) -> dict:
+        props = typing.cast(dict, node_props)
+        if "class_" in props:
+            props["class"] = props.pop("class_")
+        if "is_" in props:
+            props["is"] = props.pop("is_")
+        if "value" in props and isinstance(props["value"], ForceValue):
+            props["value"] = props["value"].serialize()
+
+        self._fix_up_callables(props, path, type_class=DomNodeProperties)
         return props
 
     def _handle_event_from_frontend(self, msg: dict[str, Any]) -> bool:
         """Handles event, returns True iff there was an event handler."""
-        handler_key = msg.get(_EVENT_HANDLER_KEY)
-        if not handler_key:
-            logger.error(f'missing "{_EVENT_HANDLER_KEY}" in event message')
+        logger.debug(f"event: {msg}")
+        if "target_id" not in msg:
+            logger.warning(f'missing "target_id" in event "{msg}"')
             return False
-        handler = self._event_handlers.get(handler_key)
-        if not handler:
-            logger.warning(f'missing "{_EVENT_HANDLER_KEY}" in event message')
+        if "type" not in msg:
+            logger.warning(f'missing "type" in event "{msg}"')
             return False
 
-        msg = msg.copy()
-        del msg[_EVENT_HANDLER_KEY]
+        handler_key = msg.get("_flyweb_handler_key")
+        if not handler_key:
+            handler_key = msg["target_id"] + "/" + "on" + msg["type"]
+        handler = self._event_handlers.get(handler_key)
+        if not handler:
+            logger.warning(f"handler {handler_key} not found")
+            return False
 
         # TODO: support async event handlers.
         logger.debug(f'handling event for "{handler_key}"')
-        handler(msg)
+        # TODO: validate that msg contains the right keys.
+        handler(msg)  # type: ignore
         return True
 
     def text(self, txt: str) -> None:
-        self._last.children.append(txt)
+        if not self._node.children:
+            self._node.children = []
+        self._node.children.append(txt)
+
+    def _make_child_path(
+        self, *, tag: str, id: str | None, key: int | str | None, type_: str | None
+    ) -> list[str]:
+        # If "id" is given, just use that.
+        if id:
+            return [id]
+        p = tag
+        if key is not None:
+            if key in self._ctx.children_keys:
+                raise RuntimeError(f'repeated key "{key}" under {self._ctx.path}')
+            self._ctx.children_keys.add(key)
+            p += f"[{key}]"
+        else:
+            if type_:
+                p += f"[{type_}]"
+            count = self._ctx.children_ids.get(p)
+            self._ctx.children_ids[p] += 1
+            if count:
+                p += f"[{count}]"
+        return self._ctx.path + [p]
 
     def elem(
         self, tag: str, *children: str | DomNode, **props: Unpack[DomNodeProperties]
     ):
-        path = self._path + "--" + tag
-        if key := props.get("key"):
-            path += f"_{key}"
-        elif tag in self._children_by_tag:
-            self._children_by_tag[tag] += 1
-            path += str(self._children_by_tag[tag])
-        else:
-            self._children_by_tag[tag] = 1
+        path = self._make_child_path(
+            tag=tag, id=props.get("id"), key=props.get("key"), type_=props.get("type")
+        )
 
         for c in children:
             if not isinstance(c, (str, DomNode)):
@@ -326,10 +413,17 @@ class FlyWeb:
 
         fixed_props = self._fix_up_props(props, path)
 
-        vdom_node = DomNode(tag=tag, children=list(children), props=fixed_props)
-        self._last.children.append(vdom_node)
+        node = DomNode(
+            tag=tag,
+            children=list(children) if children else [],
+            props=fixed_props or {},
+        )
+        self._node.children.append(node)
 
-        return self._last_child_context(path)
+        return self._dom_node_context(node, path)
+
+    def add(self, renderable: _Renderable) -> None:
+        renderable.render(self)
 
     # The list of elements was imported from MDN after removing all deprecated
     # elements. Not all of the elements here will be useful.

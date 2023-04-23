@@ -146,8 +146,7 @@ class App:
     async def _update(self, *, session_id: str | None = None) -> None:
         self._flyweb = flyweb.FlyWeb()
         self._render_function(self._flyweb)
-        vdom = self._flyweb._dom
-        msg = vdom.serialize()
+        msg = flyweb.serialize(self._flyweb)
         await self._sio.emit("update", msg, to=session_id)
 
     async def _handle_socketio_event(self, _, msg) -> None:

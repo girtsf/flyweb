@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#
+# To debug: PWDEBUG=1 pytest browser_tests.py
 
 import sys
 
@@ -7,87 +9,100 @@ from playwright import async_api
 import portpicker
 import pytest
 
-from flyweb.examples.todo import __main__
+from flyweb.examples.misc import __main__
 
 
 @pytest.mark.anyio
-async def test_todo_example():
+async def test_browser_tests():
     async with anyio.create_task_group() as tg:
         port = portpicker.pick_unused_port()
         tg.start_soon(__main__.main, port)
-        # TODO(girts): wait for the server to come up.
-
         async with async_api.async_playwright() as p:
             browser = await p.chromium.launch()
             page = await browser.new_page()
 
+            # Append all console messages to a list.
+            console_messages = []
+            page.on("console", lambda msg: console_messages.append(msg))
+
             await page.goto(f"http://localhost:{port}")
             await async_api.expect(
-                page.get_by_role("heading", name="To Do")
+                page.get_by_role(
+                    "heading", name="Demo of different elements and events"
+                )
             ).to_be_visible()
 
-            write_code_text = page.get_by_text("write code")
-            write_code_checkbox = page.get_by_role("checkbox", name="write code")
-            write_more_code_text = page.get_by_text("write more code")
-            write_more_code_checkbox = page.get_by_role(
-                "checkbox", name="write more code"
+            await async_api.expect(
+                page.get_by_text("checkbox1 checked = False")
+            ).to_be_visible()
+
+            await async_api.expect(
+                page.get_by_text("checkbox2 checked = True")
+            ).to_be_visible()
+
+            await page.click("#checkbox1")
+
+            await async_api.expect(
+                page.get_by_text("checkbox1 checked = True")
+            ).to_be_visible()
+
+            await page.click("#checkbox2")
+
+            await async_api.expect(
+                page.get_by_text("checkbox2 checked = False")
+            ).to_be_visible()
+
+            await async_api.expect(page.locator("#text_input")).to_have_value("foo")
+            await async_api.expect(page.get_by_text("value = foo")).to_be_visible()
+
+            await page.locator("#text_input").press("End")
+            await page.locator("#text_input").press("Backspace")
+            await page.locator("#text_input").press("u")
+            await page.locator("#text_input").press("n")
+            await page.locator("#text_input").press("d")
+
+            # We shouldn't have updated the "value = [..]" text yet.
+            await async_api.expect(page.get_by_text("value = foo")).to_be_visible()
+
+            # Now focus somewhere else and it should get updated.
+            await page.click("#checkbox1")
+            await async_api.expect(page.get_by_text("value = found")).to_be_visible()
+
+            # Test that we can handle individual_key_down_handlers.
+            await page.locator("#text_input").press("Escape")
+            await async_api.expect(page.locator("textarea")).to_contain_text(
+                "text input custom key down"
             )
-            await async_api.expect(write_code_text).to_be_visible()
-            await async_api.expect(write_code_checkbox).to_be_visible()
-            await async_api.expect(write_code_checkbox).to_be_checked()
-            await async_api.expect(write_more_code_text).to_be_visible()
-            await async_api.expect(write_more_code_checkbox).to_be_visible()
-            await async_api.expect(write_more_code_checkbox).not_to_be_checked()
+            await async_api.expect(page.locator("textarea")).to_contain_text(
+                "'key': 'Escape'"
+            )
+            # This should have cleared out the text input.
+            await async_api.expect(page.locator("#text_input")).to_have_value("")
 
-            await write_code_checkbox.click()
-            await async_api.expect(write_code_checkbox).not_to_be_checked()
-            await write_code_text.click()
-            await async_api.expect(write_code_checkbox).to_be_checked()
+            # Now type some stuff in again.
+            await page.locator("#text_input").press("a")
+            await page.locator("#text_input").press("b")
+            await page.locator("#text_input").press("c")
+            await async_api.expect(page.locator("#text_input")).to_have_value("abc")
 
-            # Double click the label to edit it, then click away.
-            await page.get_by_text("write code").dblclick()
-            await async_api.expect(
-                page.get_by_role("listitem").get_by_role("textbox")
-            ).to_be_editable()
-            await page.keyboard.press("Control+A")
-            # TODO: once we are not sending events for every keypress, this
-            # delay can be reduced.
-            await page.keyboard.type("procrastinate", delay=100)
-            await page.locator("html").click()
-            await async_api.expect(
-                page.get_by_role("listitem").get_by_role("textbox")
-            ).to_have_count(0)
-            await async_api.expect(page.get_by_text("procrastinate")).to_be_visible()
+            # And clear it again.
+            await page.locator("#text_input").press("Escape")
+            await async_api.expect(page.locator("#text_input")).to_have_value("")
 
-            # Double click the label to edit it, then press enter.
-            await page.get_by_text("procrastinate").dblclick()
-            await async_api.expect(
-                page.get_by_role("listitem").get_by_role("textbox")
-            ).to_be_editable()
-            await page.keyboard.press("Control+A")
-            await page.keyboard.type("eat pizza", delay=100)
-            # TODO: re-add when supported.
-            # await page.keyboard.press("Enter")
-            await page.locator("html").click()
+            # Test mouseover.
+            await page.get_by_text("mouse over me").hover()
+            await async_api.expect(page.locator("textarea")).to_contain_text(
+                "span onmouseover"
+            )
 
-            await async_api.expect(
-                page.get_by_role("listitem").get_by_role("textbox")
-            ).to_have_count(0)
-            await async_api.expect(page.get_by_text("eat pizza")).to_be_visible()
+            # Test button onclick.
+            await page.get_by_role("button").click()
+            await async_api.expect(page.locator("textarea")).to_contain_text(
+                "button onclick"
+            )
 
-            # Click "DELETE" button.
-            await page.get_by_role("listitem").filter(has_text="eat pizza").get_by_role(
-                "button", name="delete"
-            ).click()
-
-            await async_api.expect(page.get_by_text("eat pizza")).to_have_count(0)
-
-            # Add a new item.
-            await page.get_by_placeholder("do what?").click()
-            await page.get_by_placeholder("do what?").fill("write tests")
-            await page.get_by_role("button", name="add").click()
-
-            await async_api.expect(page.get_by_text("write tests")).to_be_visible()
+            # Make sure we didn't forget any debug info in the console log.
+            assert console_messages == []
 
             await page.pause()
             tg.cancel_scope.cancel()
