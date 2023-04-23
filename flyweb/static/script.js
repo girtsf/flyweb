@@ -12,53 +12,102 @@ window.addEventListener("error", (event) => {
   document.getElementById("flyweb-error").showModal();
 });
 
-// Recursively replaces a dict from backend with nested Maquette VDOM.
+// Recursively replaces a [tag, props, children] from backend with nested
+// Maquette VDOM.
 function toMaquetteDom(thing) {
-  if (typeof thing == "string") {
+  if (typeof thing === "string") {
     return thing;
   }
-  if (typeof thing != "object") {
-    console.log("unexpected:", thing);
-    return;
+  if (!Array.isArray(thing) || thing.length != 3) {
+    throw new Error("expected an array of size 3, got: " + thing);
   }
-  var children = [];
-  if (thing.children != null) {
-    children = thing.children.map((x) => toMaquetteDom(x));
-  }
-  var props = {};
-  if (thing.props !== null) {
-    // Copy props so we don't modify the input.
-    props = {...thing.props};
-  }
-  // Walk through props and eval anything that looks like ["__flyweb_eval__",
-  // "..."], then wrap that in a function that sends out the result of that
-  // function to the backend.
-  for (const [k, v] of Object.entries(props)) {
-    if (v[0] === "__flyweb_eval__") {
-      const fun = eval?.(`"use strict";(${v[1]})`);
-      props[k] = (event) => {
-        // Call the evaluated function.
-        const maybeMsg = fun(event);
-        // If it returned something, send it to the backend.
-        if (maybeMsg) {
-          sio.emit("event", maybeMsg);
-        }
-      };
-    }
-  }
-
-  return maquette.h(thing.tag, props, children);
+  let [tag, props, children] = thing;
+  fixMagicalProps(props || {});
+  children = (children || []).map((x) => toMaquetteDom(x));
+  return maquette.h(tag, props, children);
 }
 
-function render() {
-  return vdom;
+// Cache of functions we've already evaluated.
+var evalFunctions = {};
+
+function fixMagicalProps(props) {
+  for (const [k, v] of Object.entries(props)) {
+    if (typeof v === "object") {
+      if (Array.isArray(v)) {
+        if (v.length == 2) {
+          switch (v[0]) {
+            case "__flyweb_event_handler":
+              props[k] = getMagicalEventHandler(v[1]);
+              break;
+            case "__flyweb_eval":
+              if (!(v[1] in evalFunctions)) {
+                evalFunctions[v[1]] = eval?.(`"use strict";(${v[1]})`);
+              }
+              props[k] = evalFunctions[v[1]];
+              break;
+          }
+        }
+      }
+    }
+  }
+}
+
+function getBasicEventParameters(ev) {
+  return {
+    type: ev.type,
+    target_id: ev.target?.id,
+    target_value: ev.target?.value,
+  };
+}
+
+function eventEventHandler(ev) {
+  const msg = getBasicEventParameters(ev);
+  sio.emit("event", msg);
+}
+
+function mouseEventHandler(ev) {
+  const msg = {
+    ...getBasicEventParameters(ev),
+    detail: ev.detail,
+    button: ev.button,
+    buttons: ev.buttons,
+  };
+  sio.emit("event", msg);
+}
+
+function keyboardEventHandler(ev) {
+  const msg = {
+    ...getBasicEventParameters(ev),
+    detail: ev.detail,
+    code: ev.code,
+    keyCode: ev.keyCode,
+  };
+  sio.emit("event", msg);
+}
+
+function getMagicalEventHandler(name) {
+  switch (name) {
+    case "no_args":
+    case "event":
+    case "focus_event":
+      return eventEventHandler;
+    case "mouse_event":
+      return mouseEventHandler;
+    case "keyboard_event":
+      return keyboardEventHandler;
+    default:
+      throw new Error(`unsupported event handler: "${name}"`);
+  }
 }
 
 sio.on("update", (msg) => {
   let init = (vdom === null);
   vdom = toMaquetteDom(msg);
   if (init) {
-    projector.append(document.getElementById('flyweb-contents'), render);
+    projector.append(
+      document.getElementById('flyweb-contents'),
+      () => vdom,
+    );
   } else {
     projector.scheduleRender();
   }

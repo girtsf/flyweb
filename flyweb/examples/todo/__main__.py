@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import sys
+
 import anyio
 
 import flyweb
@@ -109,4 +112,5 @@ async def main(port=8000):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     anyio.run(main)
