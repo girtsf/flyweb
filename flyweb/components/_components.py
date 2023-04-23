@@ -14,8 +14,8 @@ class Component:
 
     A Component is a reusable class that emits one or more DomNodes when its
     "render" function is called. "render" function can be overridden in base
-    classes, but by default, it will render as its html_tag, and take any
-    instance variables that are not prefixed with "_" as its props.
+    classes, but by default, it will render as its html_tag with props from
+    _props.
     """
 
     def __init__(self, tag: str, **props: Unpack[_flyweb.DomNodeProperties]):
@@ -31,6 +31,18 @@ class Component:
 
 
 class TextInput(Component):
+    """Stateful <input type="text"> component.
+
+    When the component loses focus ("onblur"), we receive the element's value
+    from the frontend and store it in self.value.
+
+    It's not recommended to use onkey* or oninput* events as they can "eat"
+    characters, e.g. while the event caused by the first character is going to
+    backend and back, a second character might get typed. Then response from
+    the first character event comes back and overwrites the value without the
+    additional character.
+    """
+
     def __init__(
         self,
         *,
@@ -46,11 +58,9 @@ class TextInput(Component):
             # this.
             props["key"] = "text"
         self._original_onblur = props.get("onblur")
-        props["onblur"] = self._on_blur
         props["value"] = value or ""
+        props["onblur"] = self._handle_on_blur
         super().__init__("input", **props)
-
-        # TODO: implement a client-side <on key> that sends a custom event.
 
     @property
     def value(self) -> str:
@@ -61,7 +71,7 @@ class TextInput(Component):
     def value(self, value: str) -> None:
         self._props["value"] = value
 
-    def _on_blur(self, event: _flyweb.FocusEvent) -> None:
+    def _handle_on_blur(self, event: _flyweb.FocusEvent) -> None:
         if "target_value" in event:
             self.value = event["target_value"]
         if self._original_onblur:
@@ -78,8 +88,8 @@ class CheckBox(Component):
         props = props.copy()
         if "key" not in props:
             props["key"] = "checkbox"
-        assert "onclick" not in props
-        props["onclick"] = self._on_click
+        self._original_onclick = props.pop("onclick", None)
+        props["onclick"] = self._handle_on_click
         props["type"] = "checkbox"
 
         super().__init__("input", **props)
@@ -89,5 +99,7 @@ class CheckBox(Component):
         self.props["checked"] = self.checked
         super().render(w)
 
-    def _on_click(self, _) -> None:
+    def _handle_on_click(self, event: _flyweb.MouseEvent) -> None:
         self.checked = not self.checked
+        if self._original_onclick:
+            self._original_onclick(event)
