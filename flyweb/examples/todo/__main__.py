@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import sys
+
 import anyio
 
 import flyweb
@@ -30,21 +33,25 @@ class TodoList:
             1: TodoItem(id=1, title="write code", completed=True, parent=self),
             2: TodoItem(id=2, title="write more code", parent=self),
         }
-        # TODO: re-add back on_enter_key once we have it implemented on client
-        # side.
-        self._add = components.TextInput(placeholder="do what?")
+        self._add = components.TextInput(
+            id="add",
+            placeholder="do what?",
+            clear_on_escape=True,
+            on_enter=self.add_todo,
+        )
         self._next_id = 3
 
     def delete_todo(self, id: int) -> None:
         if id in self._items:
             del self._items[id]
 
-    def _on_add(self, _) -> None:
+    def add_todo(self, title: str) -> None:
+        if not title:
+            return
         self._items[self._next_id] = TodoItem(
-            id=self._next_id, title=self._add.value, parent=self
+            id=self._next_id, title=title, parent=self
         )
         self._next_id += 1
-        self._add.value = ""
 
     def render(self, w: flyweb.FlyWeb):
         with w.div():
@@ -57,7 +64,11 @@ class TodoList:
             with w.span():
                 w.text("add:")
                 self._add.render(w)
-                w.button("add", onclick=self._on_add)
+                w.button("add", onclick=self._on_add_clicked)
+
+    def _on_add_clicked(self, _: flyweb.MouseEvent) -> None:
+        self.add_todo(self._add.value)
+        self._add.value = flyweb.ForceValue("")
 
 
 class TodoItem:
@@ -65,7 +76,7 @@ class TodoItem:
         self.id = id
         self.title = title
         self.parent = parent
-        self._completed = components.CheckBox(checked=completed)
+        self._completed = components.CheckBox(key="checkbox", checked=completed)
         self._editing: components.TextInput | None = None
 
     def render(self, w: flyweb.FlyWeb):
@@ -76,29 +87,35 @@ class TodoItem:
                     if self._editing:
                         self._editing.render(w)
                     else:
-                        w.span(self.title, ondblclick=self._on_double_click_label)
-                    w.elem("button", "delete", onclick=self._on_click_delete)
+                        w.text(self.title)
+                    w.elem("button", "edit", onclick=self._on_edit_clicked)
+                    w.elem("button", "delete", onclick=self._on_delete_clicked)
 
-    def _on_double_click_label(self, _) -> None:
+    def _on_edit_clicked(self, _) -> None:
         self._editing = components.TextInput(
+            key="edit",
             value=self.title,
             onblur=self._on_blur,
+            on_enter=self._replace_title,
             # "afterCreate" is a maquette hook that gets called when the
             # element gets attached to the real DOM.
             # TODO: flesh out a more detailed example.
             afterCreate=flyweb.FrontendFunction("function(el) { el.focus(); }"),
         )
 
+    def _replace_title(self, new_title: str) -> None:
+        self.title = new_title
+        self._editing = None
+
     def _on_blur(self, event: flyweb.Event) -> None:
         if "target_value" in event:
-            self.title = event["target_value"]
-        self._editing = None
+            self._replace_title(event["target_value"])
 
     def _on_enter_key(self, value: str) -> None:
         self.title = value
         self._editing = None
 
-    def _on_click_delete(self, ev: flyweb.MouseEvent) -> None:
+    def _on_delete_clicked(self, ev: flyweb.MouseEvent) -> None:
         self.parent.delete_todo(self.id)
 
 
@@ -109,4 +126,5 @@ async def main(port=8000):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     anyio.run(main)

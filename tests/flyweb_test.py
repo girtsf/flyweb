@@ -11,17 +11,44 @@ def _onclick(_: flyweb.Event) -> None:
     pass
 
 
-def test_fixme():
+def test_basic_rendering():
     w = flyweb.FlyWeb()
     with w.div(class_="a"):
         w.button("b", onclick=_onclick)
-        with w.span(class_="c", id="c2"):
-            w.text("d")
-    result = w._dom.serialize()
-    assert result
-    assert result["tag"] == "div"
-    assert "props" not in result
-    assert result["children"]
+        w.button("b2", onclick=_onclick)
+        w.text("c")
+        with w.span(class_="d", id="d2"):
+            w.text("e")
+    assert flyweb.serialize(w) == [
+        "div",
+        {},
+        [
+            [
+                "div",
+                {"class": "a"},
+                [
+                    [
+                        "button",
+                        {
+                            "onclick": ["_flyweb_event_handler", "event"],
+                            "id": "flyweb/div/button",
+                        },
+                        ["b"],
+                    ],
+                    [
+                        "button",
+                        {
+                            "onclick": ["_flyweb_event_handler", "event"],
+                            "id": "flyweb/div/button[1]",
+                        },
+                        ["b2"],
+                    ],
+                    "c",
+                    ["span", {"id": "d2", "class": "d"}, ["e"]],
+                ],
+            ]
+        ],
+    ]
 
 
 if __name__ == "__main__":

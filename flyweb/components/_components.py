@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+import functools
+from typing import Any, Callable, cast
 
 from typing_extensions import Unpack
 
@@ -14,8 +15,8 @@ class Component:
 
     A Component is a reusable class that emits one or more DomNodes when its
     "render" function is called. "render" function can be overridden in base
-    classes, but by default, it will render as its html_tag, and take any
-    instance variables that are not prefixed with "_" as its props.
+    classes, but by default, it will render as its html_tag with props from
+    _props.
     """
 
     def __init__(self, tag: str, **props: Unpack[_flyweb.DomNodeProperties]):
@@ -31,37 +32,108 @@ class Component:
 
 
 class TextInput(Component):
+    """Stateful <input type="text"> component.
+
+    When the component loses focus ("onblur"), we receive the element's value
+    from the frontend and store it in self.value.
+
+    It's not recommended to use onkey* or oninput* events as they can "eat"
+    characters, e.g. while the event caused by the first character is going to
+    backend and back, a second character might get typed. Then response from
+    the first character event comes back and overwrites the value without the
+    additional character.
+
+    To support reacting to <enter>, <esc> or other individual keys, you can use
+    individual_key_down_handlers that are special-cased in the frontend. See
+    https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values
+    for "key" values.
+
+    A few convenience kwarg shorthands:
+    * on_enter(callback): if <enter> is pressed, calls callback(value), then
+      clears out the value
+    * clear_on_escape=True: if <escape> is pressed, clears out the value
+    """
+
     def __init__(
         self,
         *,
         value: str | None = None,
+        individual_key_down_handlers: dict[str, _flyweb.KeyboardEventFunction]
+        | None = None,
+        on_enter: Callable[[str], None] | None = None,
+        clear_on_escape: bool = False,
         **props: Unpack[_flyweb.DomNodeProperties],
     ):
         props = props.copy()
-        if "key" not in props:
-            # Allow couple different <input> tags in one heirarchy without
-            # having to manually specify "key" for them. Without this, maquette
-            # blows up with "div had a input child added, but there is now more
-            # than one". It would be nice to come up with a better way to do
-            # this.
-            props["key"] = "text"
         self._original_onblur = props.get("onblur")
-        props["onblur"] = self._on_blur
         props["value"] = value or ""
-        super().__init__("input", **props)
+        props["onblur"] = self._handle_on_blur
+        if on_enter or clear_on_escape:
+            if individual_key_down_handlers:
+                individual_key_down_handlers = individual_key_down_handlers.copy()
+            else:
+                individual_key_down_handlers = {}
+            if on_enter:
+                if "Enter" in individual_key_down_handlers:
+                    raise RuntimeError(
+                        "can't have both on_enter and 'Enter' in"
+                        " individual_key_down_handlers"
+                    )
+                individual_key_down_handlers["Enter"] = functools.partial(
+                    self._handle_on_enter, on_enter
+                )
+            if clear_on_escape:
+                if "Escape" in individual_key_down_handlers:
+                    raise RuntimeError(
+                        "can't have both clear_on_escape and 'Escape' in"
+                        " individual_key_down_handlers"
+                    )
+                individual_key_down_handlers["Escape"] = self._handle_on_escape
 
-        # TODO: implement a client-side <on key> that sends a custom event.
+        if individual_key_down_handlers:
+            self._individual_key_down_handlers = individual_key_down_handlers
+            if "_flyweb" not in props:
+                props["_flyweb"] = {}
+            props["_flyweb"]["individualKeyDownHandlers"] = {
+                # TODO: I believe this loses annotations. Review and add tests.
+                k: functools.partial(self._handle_individual_key, v)
+                for k, v in individual_key_down_handlers.items()
+            }
+        else:
+            self._individual_key_down_handlers = None
+        super().__init__("input", **props)
 
     @property
     def value(self) -> str:
         assert "value" in self._props
-        return self._props["value"]
+        value = self._props["value"]
+        if isinstance(value, _flyweb.ForceValue):
+            return value.value
+        return value
 
     @value.setter
-    def value(self, value: str) -> None:
+    def value(self, value: str | _flyweb.ForceValue) -> None:
         self._props["value"] = value
 
-    def _on_blur(self, event: _flyweb.FocusEvent) -> None:
+    def _handle_on_enter(
+        self, orig_handler: Callable[[str], None], event: _flyweb.KeyboardEvent
+    ) -> None:
+        if "target_value" in event:
+            self.value = event["target_value"]
+        orig_handler(self.value)
+        self.value = _flyweb.ForceValue("")
+
+    def _handle_on_escape(self, _: _flyweb.KeyboardEvent) -> None:
+        self.value = _flyweb.ForceValue("")
+
+    def _handle_individual_key(
+        self, orig_handler: _flyweb.KeyboardEventFunction, event: _flyweb.KeyboardEvent
+    ) -> None:
+        if "target_value" in event:
+            self.value = event["target_value"]
+        orig_handler(event)
+
+    def _handle_on_blur(self, event: _flyweb.FocusEvent) -> None:
         if "target_value" in event:
             self.value = event["target_value"]
         if self._original_onblur:
@@ -76,10 +148,8 @@ class CheckBox(Component):
         **props: Unpack[_flyweb.DomNodeProperties],
     ):
         props = props.copy()
-        if "key" not in props:
-            props["key"] = "checkbox"
-        assert "onclick" not in props
-        props["onclick"] = self._on_click
+        self._original_onclick = props.pop("onclick", None)
+        props["onclick"] = self._handle_on_click
         props["type"] = "checkbox"
 
         super().__init__("input", **props)
@@ -89,5 +159,7 @@ class CheckBox(Component):
         self.props["checked"] = self.checked
         super().render(w)
 
-    def _on_click(self, _) -> None:
+    def _handle_on_click(self, event: _flyweb.MouseEvent) -> None:
         self.checked = not self.checked
+        if self._original_onclick:
+            self._original_onclick(event)
