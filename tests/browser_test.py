@@ -68,6 +68,15 @@ async def test_browser_tests():
             await page.click("#checkbox1")
             await async_api.expect(page.get_by_text("value = found")).to_be_visible()
 
+            # Test that we can handle individual_key_down_handlers.
+            await page.locator("#text_input").press("Escape")
+            await async_api.expect(page.locator("textarea")).to_contain_text(
+                "text input custom key down"
+            )
+            await async_api.expect(page.locator("textarea")).to_contain_text(
+                "'key': 'Escape'"
+            )
+
             # Test mouseover.
             await page.get_by_text("mouse over me").hover()
             await async_api.expect(page.locator("textarea")).to_contain_text(

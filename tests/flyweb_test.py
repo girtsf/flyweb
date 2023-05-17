@@ -29,7 +29,7 @@ def test_basic_rendering():
                     [
                         "button",
                         {
-                            "onclick": ("__flyweb_event_handler", "event"),
+                            "onclick": ["__flyweb_event_handler", "event"],
                             "id": "flyweb/div/button",
                         },
                         ["b"],
