@@ -29,6 +29,7 @@ class FrontendFunction:
 
 
 class Event(TypedDict, total=False):
+    __flyweb_handler_key: str
     type: str
     target_id: str
     # Set if "target" element has a "value" property.
@@ -50,6 +51,7 @@ class MouseEvent(UIEvent):
 
 class KeyboardEvent(UIEvent):
     code: str
+    key: str
     keyCode: int
 
 
@@ -59,8 +61,16 @@ MouseEventFunction = Callable[[MouseEvent], None]
 KeyboardEventFunction = Callable[[KeyboardEvent], None]
 
 
+class FlyWebProperties(TypedDict, total=False):
+    # If present, register onkeydown on the frontend and generate events for
+    # specified keys.
+    individualKeyDownHandlers: dict[str, KeyboardEventFunction]
+
+
 class DomNodeProperties(TypedDict, total=False):
     """Property names and types allowed on DOM nodes."""
+
+    __flyweb: FlyWebProperties
 
     # Callbacks for Maquette interactions with DOM.
     afterCreate: FrontendFunction
@@ -174,7 +184,7 @@ class FlyWeb:
         self._last: DomNode = self._dom
         self._path = ["flyweb"]
         self._children_by_tag = {}
-        self._event_handlers = {}
+        self._event_handlers: dict[str, EventFunction] = {}
 
     @contextlib.contextmanager
     def _last_child_context(self, path: list[str]):
@@ -195,20 +205,27 @@ class FlyWeb:
             self._path = prev_path
             self._children_by_tag = prev_children_by_tag
 
-    def _fix_up_callables(self, d: dict[str, Any], path: list[str]) -> None:
-        id_ = d.get("id")
+    def _fix_up_callables(
+        self, d: dict[str, Any], path: list[str], *, use_handler_key: bool = False
+    ) -> None:
+        if not d:
+            return
+        if "id" in d:
+            id_ = d.get("id")
+        else:
+            id_ = "/".join(path)
+        id_needed = False
+
         for name, value in d.items():
             if isinstance(value, FrontendFunction):
                 d[name] = (_EVAL, value.js)
                 continue
             elif isinstance(value, dict):
                 d[name] = value.copy()
-                self._fix_up_callables(d[name], path + [name])
+                self._fix_up_callables(d[name], path + [name], use_handler_key=True)
                 continue
             if not callable(value):
                 continue
-            if not id_:
-                id_ = "/".join(path)
             annots = inspect.get_annotations(value, eval_str=True)
             # annots is a dict with optional "return" key, and keys
             annots.pop("return", None)
@@ -231,10 +248,15 @@ class FlyWeb:
                         f'event handler "{callable}" has'
                         f' unsupported arg type "{arg.__name__}"'
                     )
-
-            self._event_handlers[id_, name] = value
-            d[name] = (_EVENT_HANDLER, event_handler_type)
-        if id_:
+            handler_key = f"{id_}/{name}"
+            self._event_handlers[handler_key] = value
+            if use_handler_key:
+                d[name] = [_EVENT_HANDLER, event_handler_type, handler_key]
+            else:
+                # We'll look up event by target id + "on" + event type.
+                d[name] = [_EVENT_HANDLER, event_handler_type]
+                id_needed = True
+        if id_needed:
             d["id"] = id_
 
     def _fix_up_props(self, node_props: DomNodeProperties, path: list[str]) -> dict:
@@ -257,7 +279,9 @@ class FlyWeb:
             logger.warning(f'missing "type" in event "{msg}"')
             return False
 
-        handler_key = msg["target_id"], "on" + msg["type"]
+        handler_key = msg.get("__flyweb_handler_key")
+        if not handler_key:
+            handler_key = msg["target_id"] + "/" + "on" + msg["type"]
         handler = self._event_handlers.get(handler_key)
         if not handler:
             logger.warning(f"handler {handler_key} not found")
@@ -265,7 +289,8 @@ class FlyWeb:
 
         # TODO: support async event handlers.
         logger.debug(f'handling event for "{handler_key}"')
-        handler(msg)
+        # TODO: validate that msg contains the right keys.
+        handler(msg)  # type: ignore
         return True
 
     def text(self, txt: str) -> None:

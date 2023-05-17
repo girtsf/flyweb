@@ -32,42 +32,61 @@ var evalFunctions = {};
 
 function fixMagicalProps(props) {
   for (const [k, v] of Object.entries(props)) {
-    if (typeof v === "object") {
-      if (Array.isArray(v)) {
-        if (v.length == 2) {
-          switch (v[0]) {
-            case "__flyweb_event_handler":
-              props[k] = getMagicalEventHandler(v[1]);
-              break;
-            case "__flyweb_eval":
-              if (!(v[1] in evalFunctions)) {
-                evalFunctions[v[1]] = eval?.(`"use strict";(${v[1]})`);
-              }
-              props[k] = evalFunctions[v[1]];
-              break;
-          }
-        }
-      }
+    if (typeof v !== "object") {
+      continue;
     }
+    if (!Array.isArray(v)) {
+      fixMagicalProps(v);
+      continue;
+    }
+    if (v.length == 2 && v[0] == "__flyweb_event_handler") {
+      props[k] = getMagicalEventHandler(v[1]);
+    } else if (v.length == 3 && v[0] == "__flyweb_event_handler") {
+      const fun = getMagicalEventHandler(v[1]);
+      const handlerKey = v[2];
+      props[k] = (ev) => fun(ev, handlerKey);
+    } else if (v.length == 2 && v[0] == "__flyweb_eval") {
+      if (!(v[1] in evalFunctions)) {
+        evalFunctions[v[1]] = eval?.(`"use strict";(${v[1]})`);
+      }
+      props[k] = evalFunctions[v[1]];
+      break;
+    }
+  }
+  if (props.__flyweb) {
+    Object.assign(props, fixMagicalFlyWebProps(props.__flyweb));
   }
 }
 
-function getBasicEventParameters(ev) {
-  return {
+function fixMagicalFlyWebProps(flywebProps) {
+  if (flywebProps.individualKeyDownHandlers) {
+    return {
+      onkeydown: (ev) => individualKeyHandler(ev, flywebProps.individualKeyDownHandlers),
+    };
+  }
+  return {};
+}
+
+function getBasicEventParameters(ev, handlerKey) {
+  const out = {
     type: ev.type,
     target_id: ev.target?.id,
     target_value: ev.target?.value,
   };
+  if (handlerKey !== undefined) {
+    out.__flyweb_handler_key = handlerKey;
+  }
+  return out;
 }
 
-function eventEventHandler(ev) {
-  const msg = getBasicEventParameters(ev);
+function eventEventHandler(ev, handlerKey) {
+  const msg = getBasicEventParameters(ev, handlerKey);
   sio.emit("event", msg);
 }
 
-function mouseEventHandler(ev) {
+function mouseEventHandler(ev, handlerKey) {
   const msg = {
-    ...getBasicEventParameters(ev),
+    ...getBasicEventParameters(ev, handlerKey),
     detail: ev.detail,
     button: ev.button,
     buttons: ev.buttons,
@@ -75,14 +94,22 @@ function mouseEventHandler(ev) {
   sio.emit("event", msg);
 }
 
-function keyboardEventHandler(ev) {
+function keyboardEventHandler(ev, handlerKey) {
   const msg = {
-    ...getBasicEventParameters(ev),
+    ...getBasicEventParameters(ev, handlerKey),
     detail: ev.detail,
     code: ev.code,
+    key: ev.key,
     keyCode: ev.keyCode,
   };
   sio.emit("event", msg);
+}
+
+function individualKeyHandler(ev, handlers) {
+  const handler = handlers[ev.key];
+  if (handler) {
+    handler(ev);
+  }
 }
 
 function getMagicalEventHandler(name) {

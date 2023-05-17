@@ -41,12 +41,19 @@ class TextInput(Component):
     backend and back, a second character might get typed. Then response from
     the first character event comes back and overwrites the value without the
     additional character.
+
+    To support reacting to <enter>, <esc> or other individual keys, you can use
+    individual_key_down_handlers that are special-cased in the frontend. See
+    https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values
+    for "key" values.
     """
 
     def __init__(
         self,
         *,
         value: str | None = None,
+        individual_key_down_handlers: dict[str, _flyweb.KeyboardEventFunction]
+        | None = None,
         **props: Unpack[_flyweb.DomNodeProperties],
     ):
         props = props.copy()
@@ -60,6 +67,12 @@ class TextInput(Component):
         self._original_onblur = props.get("onblur")
         props["value"] = value or ""
         props["onblur"] = self._handle_on_blur
+        if individual_key_down_handlers:
+            if not "__flyweb" in props:
+                props["__flyweb"] = {}
+            props["__flyweb"][
+                "individualKeyDownHandlers"
+            ] = individual_key_down_handlers
         super().__init__("input", **props)
 
     @property

@@ -42,7 +42,13 @@ class MiscExample:
             id="checkbox2", checked=True, onclick=self._handle_checkbox_onclick
         )
         self.text_input = components.TextInput(
-            id="text_input", value="foo", onchange=self._handle_text_input_onchange
+            id="text_input",
+            value="foo",
+            onblur=self._handle_text_input_onblur,
+            individual_key_down_handlers={
+                "Escape": self._handle_text_input_custom_key_down,
+                "Enter": self._handle_text_input_custom_key_down,
+            },
         )
         self.message = ""
 
@@ -67,7 +73,7 @@ class MiscExample:
                 with w.td():
                     self.text_input.render(w)
                 with w.td():
-                    w.text("text input")
+                    w.text("text input, handles Enter and Esc")
                 with w.td():
                     w.text(f"value = {self.text_input.value}")
             with w.tr():
@@ -98,8 +104,11 @@ class MiscExample:
     def _handle_checkbox_onclick(self, ev: flyweb.MouseEvent):
         self._show_message(f"checkbox clicked: {ev}")
 
-    def _handle_text_input_onchange(self, ev: flyweb.Event):
-        self._show_message(f"text input onchange: {ev}")
+    def _handle_text_input_onblur(self, ev: flyweb.Event):
+        self._show_message(f"text input onblur: {ev}")
+
+    def _handle_text_input_custom_key_down(self, ev: flyweb.KeyboardEvent):
+        self._show_message(f"text input custom key down: {ev}")
 
     def _handle_span_onclick(self, ev: flyweb.MouseEvent):
         self._show_message(f"span clicked: {ev}")
