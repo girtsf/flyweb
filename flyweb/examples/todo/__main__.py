@@ -33,9 +33,9 @@ class TodoList:
             1: TodoItem(id=1, title="write code", completed=True, parent=self),
             2: TodoItem(id=2, title="write more code", parent=self),
         }
-        # TODO: re-add back on_enter_key once we have it implemented on client
-        # side.
-        self._add = components.TextInput(placeholder="do what?")
+        self._add = components.TextInput(
+            placeholder="do what?", individual_key_down_handlers={"Enter": self._on_add}
+        )
         self._next_id = 3
 
     def delete_todo(self, id: int) -> None:
