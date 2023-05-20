@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 from typing import Any, cast
 
 from typing_extensions import Unpack
@@ -68,11 +69,15 @@ class TextInput(Component):
         props["value"] = value or ""
         props["onblur"] = self._handle_on_blur
         if individual_key_down_handlers:
+            self._individual_key_down_handlers = individual_key_down_handlers
             if not "__flyweb" in props:
                 props["__flyweb"] = {}
-            props["__flyweb"][
-                "individualKeyDownHandlers"
-            ] = individual_key_down_handlers
+            props["__flyweb"]["individualKeyDownHandlers"] = {
+                k: functools.partial(self._handle_individual_key, v)
+                for k, v in individual_key_down_handlers.items()
+            }
+        else:
+            self._individual_key_down_handlers = None
         super().__init__("input", **props)
 
     @property
@@ -83,6 +88,13 @@ class TextInput(Component):
     @value.setter
     def value(self, value: str) -> None:
         self._props["value"] = value
+
+    def _handle_individual_key(
+        self, orig_handler: _flyweb.KeyboardEventFunction, event: _flyweb.KeyboardEvent
+    ) -> None:
+        if "target_value" in event:
+            self.value = event["target_value"]
+        orig_handler(event)
 
     def _handle_on_blur(self, event: _flyweb.FocusEvent) -> None:
         if "target_value" in event:
