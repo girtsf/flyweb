@@ -147,3 +147,8 @@ sio.on("connect", () => {
 sio.on("disconnect", () => {
   document.getElementById("flyweb-disconnected").showModal();
 });
+
+setInterval(() => {
+  const id = document.getElementById("add");
+  console.log(`id value: ${id.value}`);
+}, 1000);

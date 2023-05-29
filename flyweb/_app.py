@@ -147,7 +147,8 @@ class App:
         self._flyweb = flyweb.FlyWeb()
         self._render_function(self._flyweb)
         msg = self._flyweb._dom.serialize()
-        import pprint # XXX
+        import pprint  # XXX
+
         pprint.pprint(msg)
         await self._sio.emit("update", msg, to=session_id)
 
