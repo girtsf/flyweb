@@ -33,7 +33,7 @@ class TodoList:
             1: TodoItem(id=1, title="write code", completed=True, parent=self),
             2: TodoItem(id=2, title="write more code", parent=self),
         }
-        self._add = components.TextInput(
+        self._add = components.TextInput(id="add",
             placeholder="do what?", individual_key_down_handlers={"Enter": self._on_add}
         )
         self._next_id = 3
@@ -47,7 +47,9 @@ class TodoList:
             id=self._next_id, title=self._add.value, parent=self
         )
         self._next_id += 1
+        # XXX: this doesn't work because value on the other end is already "".
         self._add.value = ""
+        # XXX: some kind of force clear?
 
     def render(self, w: flyweb.FlyWeb):
         with w.div():

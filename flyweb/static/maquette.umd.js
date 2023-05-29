@@ -378,6 +378,7 @@
                     propValue = "";
                 }
                 if (propName === "value") {
+                  console.log(`xxx value ${domNode} ${domNode["value"]}`);
                     // value can be manipulated by the user directly and using event.preventDefault() is not an option
                     var domValue = domNode[propName];
                     if (domValue !== propValue && // The 'value' in the DOM tree !== newValue
