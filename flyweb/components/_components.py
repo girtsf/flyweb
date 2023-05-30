@@ -70,9 +70,10 @@ class TextInput(Component):
         props["onblur"] = self._handle_on_blur
         if individual_key_down_handlers:
             self._individual_key_down_handlers = individual_key_down_handlers
-            if not "__flyweb" in props:
-                props["__flyweb"] = {}
-            props["__flyweb"]["individualKeyDownHandlers"] = {
+            if not "_flyweb" in props:
+                props["_flyweb"] = {}
+            props["_flyweb"]["individualKeyDownHandlers"] = {
+                # XXX: this loses the annotations.
                 k: functools.partial(self._handle_individual_key, v)
                 for k, v in individual_key_down_handlers.items()
             }
@@ -83,10 +84,14 @@ class TextInput(Component):
     @property
     def value(self) -> str:
         assert "value" in self._props
-        return self._props["value"]
+        value = self._props["value"]
+        if isinstance(value, _flyweb.ForceValue):
+            return value.value
+        return value
 
     @value.setter
-    def value(self, value: str) -> None:
+    def value(self, value: str | _flyweb.ForceValue) -> None:
+        # XXX: I could make this use ForceValue here!!
         self._props["value"] = value
 
     def _handle_individual_key(

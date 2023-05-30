@@ -39,13 +39,13 @@ function fixMagicalProps(props) {
       fixMagicalProps(v);
       continue;
     }
-    if (v.length == 2 && v[0] == "__flyweb_event_handler") {
+    if (v.length == 2 && v[0] == "_flyweb_event_handler") {
       props[k] = getMagicalEventHandler(v[1]);
-    } else if (v.length == 3 && v[0] == "__flyweb_event_handler") {
+    } else if (v.length == 3 && v[0] == "_flyweb_event_handler") {
       const fun = getMagicalEventHandler(v[1]);
       const handlerKey = v[2];
       props[k] = (ev) => fun(ev, handlerKey);
-    } else if (v.length == 2 && v[0] == "__flyweb_eval") {
+    } else if (v.length == 2 && v[0] == "_flyweb_eval") {
       if (!(v[1] in evalFunctions)) {
         evalFunctions[v[1]] = eval?.(`"use strict";(${v[1]})`);
       }
@@ -53,8 +53,8 @@ function fixMagicalProps(props) {
       break;
     }
   }
-  if (props.__flyweb) {
-    Object.assign(props, fixMagicalFlyWebProps(props.__flyweb));
+  if (props._flyweb) {
+    Object.assign(props, fixMagicalFlyWebProps(props._flyweb));
   }
 }
 
@@ -74,7 +74,7 @@ function getBasicEventParameters(ev, handlerKey) {
     target_value: ev.target?.value,
   };
   if (handlerKey !== undefined) {
-    out.__flyweb_handler_key = handlerKey;
+    out._flyweb_handler_key = handlerKey;
   }
   return out;
 }
@@ -147,8 +147,3 @@ sio.on("connect", () => {
 sio.on("disconnect", () => {
   document.getElementById("flyweb-disconnected").showModal();
 });
-
-setInterval(() => {
-  const id = document.getElementById("add");
-  console.log(`id value: ${id.value}`);
-}, 1000);

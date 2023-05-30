@@ -6,16 +6,30 @@ import contextlib
 import dataclasses
 import inspect
 import logging
+import time
 import typing
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, Generic, TypedDict, TypeVar
 
 from typing_extensions import Unpack
 
 logger = logging.getLogger("flyweb")
 
 
-_EVAL = "__flyweb_eval"
-_EVENT_HANDLER = "__flyweb_event_handler"
+_EVAL = "_flyweb_eval"
+_EVENT_HANDLER = "_flyweb_event_handler"
+_FORCE_VALUE = "_flyweb_force_value"
+
+
+class ForceValue:
+    def __init__(self, value: str):
+        self.value = value
+        self._timestamp = time.time()
+
+    def serialize(self) -> list[str | float]:
+        return [_FORCE_VALUE, self._timestamp, self.value]
+
+    def __repr__(self) -> str:
+        return f"ForceValue({self.value!r})"
 
 
 class FrontendFunction:
@@ -29,7 +43,7 @@ class FrontendFunction:
 
 
 class Event(TypedDict, total=False):
-    __flyweb_handler_key: str
+    _flyweb_handler_key: str
     type: str
     target_id: str
     # Set if "target" element has a "value" property.
@@ -70,7 +84,7 @@ class FlyWebProperties(TypedDict, total=False):
 class DomNodeProperties(TypedDict, total=False):
     """Property names and types allowed on DOM nodes."""
 
-    __flyweb: FlyWebProperties
+    _flyweb: FlyWebProperties
 
     # Callbacks for Maquette interactions with DOM.
     afterCreate: FrontendFunction
@@ -136,7 +150,7 @@ class DomNodeProperties(TypedDict, total=False):
     # note: the property has capital "O", while the attribute doesn't.
     readOnly: bool
     src: str
-    value: str
+    value: str | ForceValue
     size: int
     minLength: int
     maxLength: int
@@ -206,7 +220,7 @@ class FlyWeb:
             self._children_by_tag = prev_children_by_tag
 
     def _fix_up_callables(
-        self, d: dict[str, Any], path: list[str], *, use_handler_key: bool = False
+            self, d: dict[str, Any], path: list[str], *, use_handler_key: bool = False, type_class  # XXX
     ) -> None:
         if not d:
             return
@@ -222,32 +236,98 @@ class FlyWeb:
                 continue
             elif isinstance(value, dict):
                 d[name] = value.copy()
-                self._fix_up_callables(d[name], path + [name], use_handler_key=True)
+                # XXX  breakpoint()
+                if type_class:
+                    value_annots = typing.get_type_hints(type_class).get(name)
+                    print(f"XXX YYY: {name=} {value_annots=}")
+                    #  and hasattr(type_class, "__annotations__"):
+                    #  child_type_class = type_class.__annotations__.get(name)
+                    child_type_class = value_annots
+                else:
+                    child_type_class = None
+                self._fix_up_callables(d[name], path + [name], use_handler_key=True, type_class=child_type_class)
                 continue
             if not callable(value):
                 continue
-            annots = inspect.get_annotations(value, eval_str=True)
-            # annots is a dict with optional "return" key, and keys
-            annots.pop("return", None)
-            if len(annots) > 1:
+
+            # XXX: get callable type by looking at the function, and by looking
+            # at the props annotations. If they disagree, raise an error. If
+            # function does not have annotations, use type from props.
+
+            args_annots = inspect.get_annotations(value, eval_str=True)
+            # value_annots is a dict with optional "return" key, and keys
+            args_annots.pop("return", None)
+            if len(args_annots) > 1:
                 raise RuntimeError(f'event handler "{value}" has more than 1 arg')
-            if not annots:
-                event_handler_type = "no_args"
+            if args_annots:
+                _, arg = args_annots.popitem()
             else:
-                _, arg = annots.popitem()
-                if arg is Event:
-                    event_handler_type = "event"
-                elif arg is MouseEvent:
-                    event_handler_type = "mouse_event"
-                elif arg is FocusEvent:
-                    event_handler_type = "focus_event"
-                elif arg is KeyboardEvent:
-                    event_handler_type = "keyboard_event"
-                else:
+                arg = None
+
+            annot_arg = None
+            if type_class:
+                if typing.get_origin(type_class) is dict:
+                    args = typing.get_args(type_class)
+                    # args is [class 'str', typing.Callable[[...], ...]]
+                    assert len(args) == 2
+                    assert isinstance(args[1], typing.Callable)
+
+                    args = typing.get_args(args[1])
+                    # args is [[<args>], <return value>]
+                    assert len(args) == 2
+                    input_types, return_value = args
+                    assert len(input_types) == 1
+
+                    annot_arg = input_types[0]
+                    #  breakpoint()
+                    #  (Pdb) p type_class
+                    #  dict[str, typing.Callable[[flyweb._flyweb.KeyboardEvent], NoneType]]
+                    #  (Pdb) p type(type_class)
+                    #  <class 'types.GenericAlias'>
+                    #  (Pdb) type_class.__origin__
+                    #  <class 'dict'>
+                    #  (Pdb) type_class.__args__
+                    #  (<class 'str'>, typing.Callable[[flyweb._flyweb.KeyboardEvent], NoneType])
+
+                #  a = inspect.get_annotations(type_class, eval_str=True)
+                #  a2 = typing.get_type_hints(type_class)
+                #  and hasattr(type_class, "__annotations__"):
+                #  a = type_class.__annotations__.get(name)
+                #  aa = a.get(name)
+                #  props_annot = a2.get(name)
+                #  print(f"XXX: {type_class=} {a2=}")
+                #  breakpoint()
+            #  else:
+                #  props_annot = None
+
+            print(f"XXX: {name=} {arg=} {annot_arg=}")
+
+            #  if name == "Escape":
+            #      breakpoint()
+
+            if arg and annot_arg:
+                if arg is not annot_arg:
                     raise RuntimeError(
-                        f'event handler "{callable}" has'
-                        f' unsupported arg type "{arg.__name__}"'
-                    )
+                        f'XXX mismatch {arg=} and {annot_arg=}')
+            
+            if not arg:
+                arg = annot_arg
+
+            if not arg:
+                event_handler_type = "no_args"
+            elif arg is Event:
+                event_handler_type = "event"
+            elif arg is MouseEvent:
+                event_handler_type = "mouse_event"
+            elif arg is FocusEvent:
+                event_handler_type = "focus_event"
+            elif arg is KeyboardEvent:
+                event_handler_type = "keyboard_event"
+            else:
+                raise RuntimeError(
+                    f'event handler "{callable}" has'
+                    f' unsupported arg type "{arg.__name__}"'
+                )
             handler_key = f"{id_}/{name}"
             self._event_handlers[handler_key] = value
             if use_handler_key:
@@ -265,8 +345,10 @@ class FlyWeb:
             props["class"] = props.pop("class_")
         if "is_" in props:
             props["is"] = props.pop("is_")
+        if "value" in props and isinstance(props["value"], ForceValue):
+            props["value"] = props["value"].serialize()
 
-        self._fix_up_callables(props, path)
+        self._fix_up_callables(props, path, type_class=DomNodeProperties)
         return props
 
     def _handle_event_from_frontend(self, msg: dict[str, Any]) -> bool:
@@ -279,7 +361,7 @@ class FlyWeb:
             logger.warning(f'missing "type" in event "{msg}"')
             return False
 
-        handler_key = msg.get("__flyweb_handler_key")
+        handler_key = msg.get("_flyweb_handler_key")
         if not handler_key:
             handler_key = msg["target_id"] + "/" + "on" + msg["type"]
         handler = self._event_handlers.get(handler_key)
