@@ -43,12 +43,14 @@ class TodoList:
             del self._items[id]
 
     def _on_add(self, _) -> None:
+        if not self._add.value:
+            return
         self._items[self._next_id] = TodoItem(
             id=self._next_id, title=self._add.value, parent=self
         )
         self._next_id += 1
         # XXX: this doesn't work because value on the other end is already "".
-        self._add.value = ""
+        self._add.value = flyweb.ForceValue("")
         # XXX: some kind of force clear?
 
     def render(self, w: flyweb.FlyWeb):

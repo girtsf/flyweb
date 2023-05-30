@@ -109,6 +109,8 @@ class MiscExample:
 
     def _handle_text_input_custom_key_down(self, ev: flyweb.KeyboardEvent):
         self._show_message(f"text input custom key down: {ev}")
+        if ev.get("key") == "Esc":
+            self.text_input.value = flyweb.ForceValue("")
 
     def _handle_span_onclick(self, ev: flyweb.MouseEvent):
         self._show_message(f"span clicked: {ev}")

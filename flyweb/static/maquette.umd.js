@@ -373,6 +373,20 @@
                     }
                 }
             }
+            // XXX
+            else if (Array.isArray(propValue) && propValue.length == 3 && propValue[0] == "__flyweb_force_value") {
+              const forceId = propValue[1];
+              const forceValue = propValue[2];
+              const prevForceId = domNode[propName + "-previous-force-id"];
+              if (prevForceId != forceId) {
+                console.log("force id mismatch, setting XXX");
+                domNode[propName] = forceValue;
+                domNode[propName + "-previous-force-id"] = forceId;
+              } else {
+                console.log("force id is the same");
+              }
+            }
+            // XXX
             else {
                 if (!propValue && typeof previousValue === "string") {
                     propValue = "";
