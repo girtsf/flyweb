@@ -1,3 +1,3 @@
 #!/usr/bin/bash
 
-exec pre-commit run --all-files --hook-stage pre-push
+exec poetry run pre-commit run --show-diff-on-failure --all-files --hook-stage pre-push
