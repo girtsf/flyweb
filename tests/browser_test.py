@@ -4,6 +4,7 @@ import sys
 
 import anyio
 from playwright import async_api
+import portpicker
 import pytest
 
 from flyweb.examples.todo import __main__
@@ -11,14 +12,15 @@ from flyweb.examples.todo import __main__
 
 @pytest.mark.anyio
 async def test_todo_example():
-    async with async_api.async_playwright() as p:
-        browser = await p.chromium.launch()
-        page = await browser.new_page()
+    async with anyio.create_task_group() as tg:
+        port = portpicker.pick_unused_port()
+        tg.start_soon(__main__.main, port)
+        # TODO(girts): wait for the server to come up.
 
-        async with anyio.create_task_group() as tg:
-            # TODO: auto-pick a port.
-            port = 8001
-            tg.start_soon(__main__.main, port)
+        async with async_api.async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+
             await page.goto(f"http://localhost:{port}")
             await async_api.expect(
                 page.get_by_role("heading", name="To Do")
