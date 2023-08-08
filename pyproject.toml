@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flyweb"
-version = "0.1.2"
+version = "0.2.0"
 description = "Immediate-mode web framework"
 authors = ["Girts Folkmanis <opensource@girts.me>"]
 license = "MIT"
