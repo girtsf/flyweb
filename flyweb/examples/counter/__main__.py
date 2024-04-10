@@ -17,6 +17,7 @@ class Counter:
         self._count = 0
 
     def render(self, w: flyweb.FlyWeb) -> None:
+        w.set_title(f"Counter: {self._count}")
         with w.div():
             w.text(f"count is {self._count}")
         with w.div():

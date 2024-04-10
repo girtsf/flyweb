@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 from importlib import resources
 import logging
 import pathlib
 import re
 import tempfile
-from typing import Callable, Iterable
+import time
+from typing import Any, Callable, Iterable
 
 import anyio
 import socketio
@@ -14,6 +16,18 @@ import socketio
 import flyweb
 
 logger = logging.getLogger("flyweb")
+
+
+@dataclasses.dataclass
+class _DomUpdateMessage:
+    """Message that gets sent to frontend at every update."""
+
+    vdom: list[str | dict | list]
+    title: str
+    server_start_time: int
+
+    def serialize(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
 
 
 class App:
@@ -46,6 +60,13 @@ class App:
         self._flyweb = flyweb.FlyWeb()
         self._sio_app = None
         self._ctx = None
+        # Timestamp of when server was started. This gets set to the frontend so that
+        # frontend can reload the page if server was restarted, in case any static
+        # content has been updated.
+        self._server_start_time = int(time.time())
+
+        # Title of the page, updated by FlyWeb.set_title().
+        self._title: str = "flyweb"
         # Wait to initialize it until we are running. Otherwise, this blows up
         # if the object is instantiated before running in async context.
         self._update_requested: anyio.Event | None = None
@@ -146,8 +167,13 @@ class App:
     async def _update(self, *, session_id: str | None = None) -> None:
         self._flyweb = flyweb.FlyWeb()
         self._render_function(self._flyweb)
-        msg = flyweb.serialize(self._flyweb)
-        await self._sio.emit("update", msg, to=session_id)
+        vdom = flyweb.serialize(self._flyweb)
+        if self._flyweb._title is not None:
+            self._title = self._flyweb._title
+        msg = _DomUpdateMessage(
+            vdom=vdom, title=self._title, server_start_time=self._server_start_time
+        )
+        await self._sio.emit("update", msg.serialize(), to=session_id)
 
     async def _handle_socketio_event(self, _, msg) -> None:
         if not isinstance(msg, dict):

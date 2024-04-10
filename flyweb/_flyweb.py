@@ -220,6 +220,8 @@ class FlyWeb:
         self._root = DomNode(tag="div")
         self._node: DomNode = self._root
         self._ctx = _DomNodeContext(path=["flyweb"])
+        # Page title: if not None, the title will be updated to given value.
+        self._title: str | None = None
 
         self._event_handlers: dict[str, EventFunction] = {}
 
@@ -373,6 +375,9 @@ class FlyWeb:
         # TODO: validate that msg contains the right keys.
         handler(msg)  # type: ignore
         return True
+
+    def set_title(self, title: str) -> None:
+        self._title = title
 
     def text(self, txt: str) -> None:
         if not self._node.children:
