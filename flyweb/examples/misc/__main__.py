@@ -74,7 +74,7 @@ class MiscExample:
                 with w.td():
                     self.text_input.render(w)
                 with w.td():
-                    w.text("text input, handles Enter and Esc")
+                    w.text("text input, handles Enter and Esc, sets title on Enter")
                 with w.td():
                     w.text(f"value = {self.text_input.value}")
                     if self.text_input_enter_value is not None:
@@ -82,6 +82,7 @@ class MiscExample:
                             " value when Enter was pressed ="
                             f" {self.text_input_enter_value}"
                         )
+                        w.set_title(self.text_input_enter_value)
             with w.tr():
                 with w.td():
                     w.span("click me", onclick=self._handle_span_onclick)

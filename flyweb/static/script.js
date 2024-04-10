@@ -1,6 +1,14 @@
 var vdom = null;
+// Keep track of server's reported start time and reload the page if it
+// changes, in case any of the static content has changed.
+var server_start_time = null;
 var sio = io();
 var projector = maquette.createProjector();
+
+function showError(err) {
+  document.getElementById("flyweb-error-messages").innerText = err;
+  document.getElementById("flyweb-error").showModal();
+}
 
 window.addEventListener("error", (event) => {
   console.log("Caught top-level error", event.error);
@@ -8,8 +16,7 @@ window.addEventListener("error", (event) => {
   if (event.error.error) {
     err = event.error.error.stack;
   }
-  document.getElementById("flyweb-error-messages").innerText = err;
-  document.getElementById("flyweb-error").showModal();
+  showError(msg);
 });
 
 // Recursively replaces a [tag, props, children] from backend with nested
@@ -164,11 +171,25 @@ function getMagicalEventHandler(name) {
 
 sio.on("update", (msg) => {
   let init = vdom === null;
-  vdom = toMaquetteDom(msg);
-  if (init) {
-    projector.append(document.getElementById("flyweb-contents"), () => vdom);
-  } else {
-    projector.scheduleRender();
+  if (msg.server_start_time) {
+    if (server_start_time !== null && server_start_time != msg.server_start_time) {
+      showError("Server has restarted, reloading the page...");
+      window.setTimeout(() => window.location.reload(), 1000);
+      // Don't try to update the DOM.
+      return;
+    }
+    server_start_time = msg.server_start_time;
+  }
+  if (msg.vdom) {
+    vdom = toMaquetteDom(msg.vdom);
+    if (init) {
+      projector.append(document.getElementById("flyweb-contents"), () => vdom);
+    } else {
+      projector.scheduleRender();
+    }
+  }
+  if (msg.title) {
+    document.title = msg.title;
   }
 });
 

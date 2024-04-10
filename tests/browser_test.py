@@ -89,6 +89,17 @@ async def test_browser_tests():
             await page.locator("#text_input").press("Escape")
             await async_api.expect(page.locator("#text_input")).to_have_value("")
 
+            # Test that title starts out as "flyweb".
+            title = await page.title()
+            assert title == "flyweb"
+
+            # Test that pressing Enter on the text replaces page title.
+            await page.locator("#text_input").press("h")
+            await page.locator("#text_input").press("i")
+            await page.locator("#text_input").press("Enter")
+            title = await page.title()
+            assert title == "hi"
+
             # Test mouseover.
             await page.get_by_text("mouse over me").hover()
             await async_api.expect(page.locator("textarea")).to_contain_text(
