@@ -1,47 +1,65 @@
-[tool.poetry]
+[project]
 name = "flyweb"
-version = "0.2.0"
+version = "0.3.0"
 description = "Immediate-mode web framework"
-authors = ["Girts Folkmanis <opensource@girts.me>"]
-license = "MIT"
-readme = "README.md"
-
-include = [
-  "flyweb/static/*.js",
-  "flyweb/static/*.html",
+authors = [
+    { name = "Girts Folkmanis", email = "opensource@girts.me" }
 ]
-
-[tool.poetry.dependencies]
-python = "^3.10"
-python-socketio = "^5.7.2"
-anyio = "^3.6.2"
-hypercorn = {version = "^0.14.3", optional = true}
-typing-extensions = "^4.5.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.2.2"
-black = "^23.1.0"
-isort = "^5.12.0"
-pre-commit = "^3.1.1"
+license = "MIT"
+dependencies = [
+    "python-socketio>=5.7.2",
+    "anyio>=3.6",
+    "typing-extensions>=4.5.0",
+]
+readme = "README.md"
+requires-python = ">= 3.10"
 
 # We don't install an ASGI server by default. You have to install
 # flyweb[examples] or flyweb[server] for hypercorn to be installed.
-pytest-playwright = "^0.3.2"
-portpicker = "^1.5.2"
 
-[tool.poetry.extras]
-examples = ["hypercorn"]
-server = ["hypercorn"]
+[project.optional-dependencies]
+examples = [
+    "hypercorn>=0.14.3",
+]
+server = [
+    "hypercorn>=0.14.3",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.isort]
-profile = "black"
-force_single_line = true
-force_sort_within_sections = true
-single_line_exclusions = ["typing", "typing_extensions"]
+[tool.rye]
+managed = true
+dev-dependencies = [
+    "hypercorn>=0.14.3",
+    "portpicker>=1.6.0",
+    "pytest-playwright>=0.4.4",
+    "pytest>=8.1.1",
+    "pre-commit>=3.7.0",
+    "ruff>=0.3.7",
+    "pyright>=1.1.358",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flyweb"]
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # isort
+    "I",
+]
 
 [tool.pyright]
 venvPath = "."

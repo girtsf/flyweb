@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
 import anyio
-
 import flyweb
 
 try:
     import hypercorn  # noqa: F401
 except ImportError:
-    raise RuntimeError("install extras with flyweb[examples] to run this!")
+    raise RuntimeError("install extras with flyweb[examples] to run this!") from None
 
 
 class Counter:

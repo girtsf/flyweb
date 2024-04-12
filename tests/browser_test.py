@@ -5,11 +5,10 @@
 import sys
 
 import anyio
-from playwright import async_api
 import portpicker
 import pytest
-
 from flyweb.examples.misc import __main__
+from playwright import async_api
 
 
 @pytest.mark.anyio

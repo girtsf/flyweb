@@ -10,23 +10,16 @@ repos:
       - id: check-merge-conflict
       - id: end-of-file-fixer
       - id: trailing-whitespace
-  - repo: https://github.com/psf/black
-    # Should match pyproject.toml.
-    rev: 23.1.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.7
     hooks:
-      - id: black
-        language_version: python3.10
-  - repo: https://github.com/pycqa/isort
-    # Should match pyproject.toml.
-    rev: 5.12.0
-    hooks:
-      - id: isort
-  - repo: https://github.com/pycqa/flake8
-    rev: '6.0.0'
-    hooks:
-      - id: flake8
+      # Run the linter.
+      - id: ruff
+        args: [ --fix ]
+      # Run the formatter.
+      - id: ruff-format
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.299
+    rev: v1.1.358
     hooks:
       - id: pyright
         entry: pyright

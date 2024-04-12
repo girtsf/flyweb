@@ -4,33 +4,28 @@
 
 set -o errexit
 
-POETRY_VERSION=1.4.1
-
-function setup_poetry {
-  echo "Installing poetry..."
-
-  # Work around https://github.com/python-poetry/poetry/issues/1917
-  export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
-
-  curl -sSL https://install.python-poetry.org | python3 - --version "$POETRY_VERSION"
-  # If the path wasn't in user's profile before, we'll fail the "poetry"
-  # calls below. With this, we can finish bootstrapping.
-  PATH="$HOME/.local/bin:$PATH"
-}
-
-function setup_venv {
-  poetry install --all-extras
-  poetry run playwright install
-}
-
-function setup_precommit {
-  poetry run pre-commit install -t pre-push
+function check_rye {
+  echo "checking rye..."
+  if ! command -v rye &>/dev/null; then
+    if [ -d "$HOME/.rye" ]; then
+      echo "found $HOME/.rye/, but is not in PATH"
+      exit 1
+    fi
+    echo "rye not found, please install it with:"
+    echo
+    echo "  curl -sSf https://rye-up.com/get | bash"
+    echo
+    echo "See: https://rye-up.com/guide/installation"
+    exit 1
+  fi
+  echo "rye found!"
 }
 
 function main {
-  setup_poetry
-  setup_venv
-  setup_precommit
+  check_rye
+  rye sync --features server
+  rye run playwright install chromium
+  rye run pre-commit install -t pre-push
 }
 
 cd "$(dirname "${BASH_SOURCE[0]}")"

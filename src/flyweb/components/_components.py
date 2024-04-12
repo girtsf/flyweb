@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import functools
-from typing import Any, Callable, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 from typing_extensions import Unpack
 
@@ -57,7 +58,6 @@ class TextInput(Component):
     def __init__(
         self,
         *,
-        value: str | None = None,
         individual_key_down_handlers: dict[str, _flyweb.KeyboardEventFunction]
         | None = None,
         on_enter: Callable[[str], None] | None = None,
@@ -65,8 +65,8 @@ class TextInput(Component):
         **props: Unpack[_flyweb.DomNodeProperties],
     ):
         props = props.copy()
+        props.setdefault("value", "")
         self._original_onblur = props.get("onblur")
-        props["value"] = value or ""
         props["onblur"] = self._handle_on_blur
         if on_enter or clear_on_escape:
             if individual_key_down_handlers:
@@ -143,8 +143,6 @@ class TextInput(Component):
 class CheckBox(Component):
     def __init__(
         self,
-        *,
-        checked: bool = False,
         **props: Unpack[_flyweb.DomNodeProperties],
     ):
         props = props.copy()
@@ -153,7 +151,7 @@ class CheckBox(Component):
         props["type"] = "checkbox"
 
         super().__init__("input", **props)
-        self.checked = checked
+        self.checked = props.setdefault("checked", False)
 
     def render(self, w: _flyweb.FlyWeb) -> None:
         self.props["checked"] = self.checked

@@ -2,9 +2,8 @@
 
 import sys
 
-import pytest
-
 import flyweb
+import pytest
 
 
 def _onclick(_: flyweb.Event) -> None:
