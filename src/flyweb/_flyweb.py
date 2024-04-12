@@ -9,7 +9,8 @@ import inspect
 import logging
 import time
 import typing
-from typing import Any, Callable, Protocol, Type, TypedDict
+from collections.abc import Callable
+from typing import Any, Protocol, TypedDict
 
 from typing_extensions import Unpack
 
@@ -211,8 +212,7 @@ class _DomNodeContext:
 class _Renderable(Protocol):
     """Protocol for things that implement "render" method."""
 
-    def render(self, w: FlyWeb) -> None:
-        ...
+    def render(self, w: FlyWeb) -> None: ...
 
 
 class FlyWeb:
@@ -243,7 +243,7 @@ class FlyWeb:
         path: list[str],
         *,
         use_handler_key: bool = False,
-        type_class: Type[DomNodeProperties] | dict[str, Any] | None,
+        type_class: type[DomNodeProperties] | dict[str, Any] | None,
     ) -> None:
         if not d:
             return
@@ -413,7 +413,7 @@ class FlyWeb:
         )
 
         for c in children:
-            if not isinstance(c, (str, DomNode)):
+            if not isinstance(c, str | DomNode):
                 raise TypeError(f"unexpected type for {path}: {c.__class__.__name__}")
 
         fixed_props = self._fix_up_props(props, path)

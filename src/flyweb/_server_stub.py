@@ -1,7 +1,7 @@
 # This file is imported by __init__.py if the server optional dependencies are
 # not installed.
 
-from typing import Callable
+from collections.abc import Callable
 
 import flyweb
 

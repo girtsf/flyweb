@@ -1,7 +1,5 @@
-import asyncio
-import functools
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 import anyio
 import hypercorn
@@ -34,14 +32,35 @@ class Server:
         cfg.access_log_format = '%(h)s "%(R)s" %(s)s %(b)s "%(f)s" "%(a)s"'
         cfg.errorlog = logging.getLogger("hypercorn.errorlog")
 
+        event = anyio.Event()
+        async with anyio.create_task_group() as tg:
+            await tg.start(self._serve, cfg, event)
+            task_status.started()
+            try:
+                await anyio.sleep_forever()
+            finally:
+                # See comment in _serve.
+                with anyio.move_on_after(1, shield=True):
+                    event.set()
+
+    async def _serve(
+        self,
+        cfg: hypercorn.Config,
+        event: anyio.Event,
+        *,
+        task_status=anyio.TASK_STATUS_IGNORED,
+    ) -> None:
         async with self._app as app:
             task_status.started()
-            await hypercorn.asyncio.serve(
-                app,
-                cfg,
-                # Without this, hypercorn installs its own interrupt handler.
-                shutdown_trigger=functools.partial(asyncio.sleep, 2e9),
-            )
+            # We shield hypercorn from direct cancellation, and terminate it using
+            # shutdown_trigger. This works around https://github.com/pgjones/hypercorn/issues/184.
+            with anyio.CancelScope(shield=True):
+                await hypercorn.asyncio.serve(
+                    app,
+                    cfg,
+                    # Without this, hypercorn installs its own interrupt handler.
+                    shutdown_trigger=event.wait,
+                )
 
     def schedule_update(self) -> None:
         self._app.schedule_update()

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
-from importlib import resources
 import logging
 import pathlib
 import re
 import tempfile
 import time
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
+from importlib import resources
+from typing import Any
 
 import anyio
 import socketio

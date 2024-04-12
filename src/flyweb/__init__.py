@@ -1,13 +1,15 @@
 from ._app import App
-from ._flyweb import Event
-from ._flyweb import FlyWeb
-from ._flyweb import FocusEvent
-from ._flyweb import ForceValue
-from ._flyweb import FrontendFunction
-from ._flyweb import KeyboardEvent
-from ._flyweb import MouseEvent
-from ._flyweb import UIEvent
-from ._flyweb import serialize
+from ._flyweb import (
+    Event,
+    FlyWeb,
+    FocusEvent,
+    ForceValue,
+    FrontendFunction,
+    KeyboardEvent,
+    MouseEvent,
+    UIEvent,
+    serialize,
+)
 
 # You must install flyweb[server] to include an asgi server.
 try:

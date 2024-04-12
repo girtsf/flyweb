@@ -6,14 +6,13 @@ import logging
 import sys
 
 import anyio
-
 import flyweb
 from flyweb import components
 
 try:
     import hypercorn as _  # noqa: F401
 except ImportError:
-    raise RuntimeError("install extras with flyweb[examples] to run this!")
+    raise RuntimeError("install extras with flyweb[examples] to run this!") from None
 
 
 # CSS fragment that will be sent to frontend.
