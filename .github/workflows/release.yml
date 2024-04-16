@@ -28,5 +28,5 @@ jobs:
         run: rye pin 3.10
       - name: Build
         run: rye build
-      # - name: Publish
-      #   uses: pypa/gh-action-pypi-publish@release/v1.8
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1.8
