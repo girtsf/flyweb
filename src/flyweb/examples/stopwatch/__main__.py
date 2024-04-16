@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import datetime
+import logging
+import sys
 
 import anyio
 import flyweb
@@ -72,4 +74,5 @@ async def main():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     anyio.run(main)
