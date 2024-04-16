@@ -1,6 +1,7 @@
 [project]
 name = "flyweb-framework"
-version = "0.3.2"
+# Updated by CI when publishing.
+version = "0.4+placeholder.0"
 description = "Immediate-mode web framework"
 authors = [
     { name = "Girts Folkmanis", email = "opensource@girts.me" }
