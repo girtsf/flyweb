@@ -31,6 +31,9 @@ class Server:
         cfg.accesslog = logging.getLogger("hypercorn.accesslog")
         cfg.access_log_format = '%(h)s "%(R)s" %(s)s %(b)s "%(f)s" "%(a)s"'
         cfg.errorlog = logging.getLogger("hypercorn.errorlog")
+        # Don't wait too long for connections to close, as it seems to keep waiting for
+        # websocket connections forever.
+        cfg.graceful_timeout = 0.5  # seconds
 
         event = anyio.Event()
         async with anyio.create_task_group() as tg:
