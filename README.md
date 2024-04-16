@@ -40,12 +40,12 @@ if __name__ == "__main__":
 ```
 
 There are a couple more examples under
-[flyweb/examples](https://github.com/girtsf/flyweb/tree/main/flyweb/examples).
+[src/flyweb/examples](https://github.com/girtsf/flyweb/tree/main/src/flyweb/examples).
 
 ## Try it out
 
 ```
-$ pip install 'flyweb[examples] @ git+https://github.com/girtsf/flyweb'
+$ pip install 'flyweb-framework[examples]'
 $ python -m flyweb.examples.todo
 ```
 
@@ -83,5 +83,10 @@ backend if you try.
 
 ## Status
 
-It works, at least for simple pages. The API is definitely not stable and will
-likely change as it evolves.
+* It works, and I've been successfully using it for a handful of different
+  internal tools.
+* Using stateful elements (e.g., checkboxes or textboxes) isn't yet as
+  streamlined as I would like. You have to instantiate (and reuse) objects that
+  keep track of the state
+  ([example](https://github.com/girtsf/flyweb/blob/f020e68acc766b1967ee4819a37de1d8d06b3775/src/flyweb/examples/todo/__main__.py#L78)).
+* The API is likely going to change as things evolve.
